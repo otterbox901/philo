@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Philo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;1,400&family=GFS+Didot&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Dawn on Olympus. One column: wordmark, the quote set large in the open sky, a marble tablet to write on. */
+  --sky: #a9c8e8;
+  --marble: #fdfaf5;
+  --ink: #1d2943;
+  --ink-soft: #4a5571;
+  --gold: #b98a3a;
+  --gold-deep: #85601f;
+  --gold-light: #ead08c;
+  --font-display: "GFS Didot", Didot, "Bodoni 72", "Bodoni MT", Georgia, serif;
+  --font-body: "Alegreya Sans", "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background-color: var(--sky);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Sky: CSS paints the dawn gradient, canvas paints mountains and clouds ── */
+.sky, .veil {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: block;
+}
+.sky {
+  z-index: 0;
+  background:
+    radial-gradient(60% 42% at 22% 100%, rgba(255, 207, 152, .85), rgba(255, 207, 152, 0) 72%),
+    linear-gradient(180deg, #8db4de 0%, #b2cce9 28%, #d9d9ea 54%, #f4d5c6 76%, #fbe3d2 100%);
+}
+.veil { z-index: 2; }
+
+.app {
+  position: relative;
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow-x: clip;
+}
+
+/* ── Masthead ── */
+.masthead {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px clamp(16px, 4vw, 44px);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.coin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1;
+  color: var(--gold-deep);
+  background: radial-gradient(circle at 34% 30%, #fff7de, var(--gold-light) 62%, #d4ab5a);
+  box-shadow: inset 0 0 0 1px rgba(133, 96, 31, .45), 0 1px 2px rgba(60, 40, 10, .18);
+}
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: .42em;
+  margin-right: -.42em;
+  text-transform: uppercase;
+}
+.gloss { margin: 0; font-family: var(--font-display); font-size: 17px; }
+.gloss span { font-family: var(--font-body); font-style: italic; font-size: 15px; }
+
+/* ── The oracle: echo of what you wrote, then the quote ── */
+.oracle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 5vh, 56px) 16px;
+}
+.reply {
+  position: relative;
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  text-align: center;
+}
+/* soft marble-white light behind the text keeps it legible over moving clouds */
+.reply::before, .reply::after {
+  content: "";
+  position: absolute;
+  inset: -16% -10%;
+  z-index: 0;
+  pointer-events: none;
+}
+.reply::before {
+  background: radial-gradient(closest-side, rgba(255, 252, 247, .86), rgba(255, 252, 247, .55) 52%, rgba(255, 252, 247, 0));
+}
+.reply::after {
+  background: radial-gradient(closest-side, rgba(255, 224, 160, .7), rgba(255, 224, 160, 0));
+  opacity: 0;
+}
+.reply.is-glowing::after { animation: glow 2.2s var(--ease-out) both; }
+@keyframes glow {
+  0% { opacity: 0; transform: scale(.8); }
+  35% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+
+.lede, .echo {
+  position: relative;
+  z-index: 1;
+  max-width: 34em;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+.echo[hidden], .lede[hidden] { display: none; }
+.echo.is-new { animation: rise .6s var(--ease-out) both; }
+.echo-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+}
+.echo-text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+.quote {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transition: opacity .45s ease, filter .45s ease;
+}
+.quote.is-veiled { opacity: 0; filter: blur(6px); }
+.quote-mark {
+  display: block;
+  height: .42em;
+  font-family: var(--font-display);
+  font-size: 88px;
+  line-height: 1;
+  color: var(--gold);
+}
+.quote-text {
+  margin: 0;
+  max-width: 680px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.quote[data-size="xl"] .quote-text { font-size: clamp(29px, 4.3vw, 46px); line-height: 1.2; }
+.quote[data-size="l"]  .quote-text { font-size: clamp(25px, 3.3vw, 36px); line-height: 1.25; }
+.quote[data-size="m"]  .quote-text { font-size: clamp(21px, 2.5vw, 28px); line-height: 1.35; text-wrap: pretty; }
+.quote[data-size="s"]  .quote-text { font-size: clamp(18px, 2vw, 22px);   line-height: 1.45; text-wrap: pretty; }
+.quote.is-error .quote-mark { display: none; }
+.quote.is-error .quote-text { font-family: var(--font-body); color: var(--ink-soft); }
+
+.quote-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+}
+.quote-meta[hidden] { display: none; }
+.quote-rule { width: 36px; height: 1px; background: var(--gold); }
+.quote-author {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 15px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+}
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 10px;
+  font: 500 13px/1 var(--font-body);
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid rgba(133, 96, 31, .3);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color .2s, color .2s, border-color .2s;
+}
+.copy:hover { background: rgba(255, 255, 255, .92); color: var(--ink); border-color: rgba(133, 96, 31, .55); }
+.copy svg { width: 14px; height: 14px; flex: none; }
+.copy .icon-done { display: none; }
+.copy.is-done { color: var(--gold-deep); }
+.copy.is-done .icon-copy { display: none; }
+.copy.is-done .icon-done { display: block; }
+
+.quote.is-revealing .quote-mark { animation: rise 1s .05s var(--ease-out) both; }
+.quote.is-revealing .quote-text { animation: rise 1.2s .18s var(--ease-out) both; }
+.quote.is-revealing .quote-meta { animation: rise .9s .6s var(--ease-out) both; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); filter: blur(5px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* status sits above the veil canvas, inside the gathered clouds */
+.status {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  opacity: 0;
+  transition: opacity .4s ease;
+  pointer-events: none;
+}
+.status.is-on { opacity: 1; }
+.status .dot { animation: blink 1.4s infinite both; }
+.status .dot:nth-child(2) { animation-delay: .2s; }
+.status .dot:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .15; } 40% { opacity: 1; } }
+
+/* ── Marble tablet ── */
+.tablet {
+  position: relative;
+  z-index: 3;
+  width: min(720px, calc(100% - 32px));
+  margin: 0 auto clamp(16px, 4vh, 32px);
+  padding: 12px 12px 10px;
+  background: linear-gradient(180deg, #fffdf9, #f6f0e7);
+  border: 1px solid rgba(133, 96, 31, .28);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 22px 44px -22px rgba(60, 50, 90, .45),
+    0 3px 8px rgba(60, 50, 90, .08);
+  transition: border-color .2s, box-shadow .2s;
+}
+/* faint veining */
+.tablet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='260'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0032 0.012' numOctaves='5' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.40 0 0 0 0 0.50 1 0 0 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0 0 0 0 0 0 0 0 0 0 0 .2 0 0 0 0 0 0 0 0 0 0 0 0'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E") center / cover no-repeat;
+}
+.tablet:focus-within {
+  border-color: rgba(133, 96, 31, .6);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px rgba(234, 208, 140, .6),
+    0 22px 44px -22px rgba(60, 50, 90, .45);
+}
+.frieze {
+  position: relative;
+  height: 12px;
+  margin: 0 6px 6px;
+  opacity: .8;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='12' viewBox='0 0 16 12'%3E%3Cpath d='M0 11H16M13 11V1H3V8H10V4H6.5' fill='none' stroke='%23b98a3a' stroke-width='1.2'/%3E%3C/svg%3E") left center / 16px 12px repeat-x;
+}
+.tablet textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 2.4em;
+  max-height: 10em;
+  padding: 6px 8px;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: 20px/1.45 var(--font-display);   /* what you type is set in the same serif as the reply */
+  color: var(--ink);
+}
+.tablet textarea::placeholder { color: #6a7189; }
+.tablet-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 0 8px;
+}
+.count {
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.count.is-near { color: var(--gold-deep); font-weight: 500; }
+.hint { font-size: 13px; color: var(--ink-soft); }
+.hint kbd { font: inherit; font-weight: 500; }
+.ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px 9px 18px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: linear-gradient(180deg, #f2dda2, #d5ad5b);
+  border: 1px solid rgba(133, 96, 31, .5);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 1px 2px rgba(80, 55, 10, .2);
+  cursor: pointer;
+  transition: transform .15s ease, filter .2s, opacity .2s;
+}
+.ask svg { width: 16px; height: 16px; flex: none; }
+.ask:hover:not(:disabled) { filter: brightness(1.05); transform: translateY(-1px); }
+.ask:active:not(:disabled) { transform: scale(.97); }
+.ask:disabled { opacity: .5; cursor: not-allowed; }
+
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.tablet textarea:focus-visible { outline: none; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 600px) {
+  .masthead { padding: 16px; }
+  .gloss, .hint { display: none; }
+  .tablet textarea { font-size: 18px; }
+  .quote-mark { font-size: 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quote.is-veiled { filter: none; }
+  .quote.is-revealing > *, .echo.is-new { animation-name: fade; animation-duration: .3s; animation-delay: 0s; }
+  .reply.is-glowing::after, .status .dot { animation: none; }
+  .ask:hover:not(:disabled), .ask:active:not(:disabled) { transform: none; }
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas class="sky" id="sky" aria-hidden="true"></canvas>
+<canvas class="veil" id="veil" aria-hidden="true"></canvas>
+
+<div class="app">
+  <header class="masthead">
+    <div class="brand">
+      <span class="coin" aria-hidden="true">Φ</span>
+      <span class="wordmark">Philo</span>
+    </div>
+    <p class="gloss"><span lang="el">φιλοσοφία</span> <span>· the love of wisdom</span></p>
+  </header>
+
+  <main class="oracle">
+    <div class="reply" id="reply">
+      <p class="lede" id="lede">Ask a question, vent, look for advice, or write pure nonsense. You'll get one quote back.</p>
+      <div class="echo" id="echo" hidden>
+        <span class="echo-label">You wrote</span>
+        <p class="echo-text" id="echo-text"></p>
+      </div>
+
+      <div class="stage" id="stage">
+        <figure class="quote" id="quote" data-size="xl">
+          <span class="quote-mark" aria-hidden="true">“</span>
+          <blockquote class="quote-text" id="quote-text">Wonder is the feeling of a philosopher, and philosophy begins in wonder.</blockquote>
+          <figcaption class="quote-meta" id="quote-meta">
+            <span class="quote-rule" aria-hidden="true"></span>
+            <cite class="quote-author" id="quote-author">Plato</cite>
+            <button class="copy" id="copy" type="button">
+              <svg class="icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>
+              <svg class="icon-done" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>
+              <span id="copy-label">Copy</span>
+            </button>
+          </figcaption>
+        </figure>
+        <p class="status" id="status"><span>Consulting the philosophers<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span></p>
+      </div>
+    </div>
+  </main>
+
+  <form class="tablet" id="ask-form" autocomplete="off">
+    <div class="frieze" aria-hidden="true"></div>
+    <label class="sr-only" for="message">Your message</label>
+    <textarea id="message" name="message" rows="1" maxlength="1000" placeholder="I'm nervous about my exam tomorrow."></textarea>
+    <div class="tablet-row">
+      <span class="count" id="count">0 / 1,000</span>
+      <span class="hint"><kbd>Enter</kbd> to ask · <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line</span>
+      <button class="ask" id="ask" type="submit" disabled>
+        Ask
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5"/></svg>
+      </button>
+    </div>
+  </form>
+
+  <div class="sr-only" id="announce" aria-live="polite"></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═══════════════════════════ Backend ═══════════════════════════
+   getQuote(text) is the only place the UI asks for a reply.
+   server.py serves this page and answers POST /api/match with { text, author, score }.
+   ═══════════════════════════════════════════════════════════════ */
+
+const FIRST = { text: "Wonder is the feeling of a philosopher, and philosophy begins in wonder.", author: "Plato" };
+
+async function getQuote(text) {
+  const res = await fetch("/api/match", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;                                    // → { text, author, score }
+}
+
+/* ═══════════════════════════ Sky engine ═══════════════════════════ */
+
+const Sky = (() => {
+  const bg = document.getElementById("sky");
+  const fg = document.getElementById("veil");
+  const bctx = bg.getContext("2d");
+  const fctx = fg.getContext("2d");
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+
+  let W = 0, H = 0, ridges = null, seaGrad = null, seaSpan = 0;
+  let ambient = [], sea = [], veil = [];
+  let wind = 1, windTarget = 1, last = 0, raf = 0;
+  const tween = { from: 0, to: 0, t0: 0, dur: 1, value: 0 };
+  let target = { cx: 0, cy: 0, w: 600, h: 220 };
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  function rng(seed) {
+    return () => {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Shared tileable value noise (256×256, five octaves), used for cloud mottling and mountain gullies.
+  const NS = 256;
+  let NT = null, noiseCanvas = null;
+  function noiseTile() {
+    if (NT) return NT;
+    const r = rng(1234);
+    NT = new Float32Array(NS * NS);
+    let amp = 1;
+    for (let cell = 32; cell >= 2; cell /= 2, amp *= 0.55) {
+      const G = NS / cell, grid = new Float32Array(G * G);
+      for (let i = 0; i < grid.length; i++) grid[i] = r();
+      for (let y = 0; y < NS; y++) {
+        const gy = y / cell, y0 = gy | 0, fy = gy - y0, sy = fy * fy * (3 - 2 * fy);
+        const ya = (y0 % G) * G, yb = ((y0 + 1) % G) * G;
+        for (let x = 0; x < NS; x++) {
+          const gx = x / cell, x0 = gx | 0, fx = gx - x0, sx = fx * fx * (3 - 2 * fx);
+          const xa = x0 % G, xb = (x0 + 1) % G;
+          const top = grid[ya + xa] + (grid[ya + xb] - grid[ya + xa]) * sx;
+          const bot = grid[yb + xa] + (grid[yb + xb] - grid[yb + xa]) * sx;
+          NT[y * NS + x] += (top + (bot - top) * sy) * amp;
+        }
+      }
+    }
+    let lo = Infinity, hi = -Infinity;
+    for (const v of NT) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    for (let i = 0; i < NT.length; i++) NT[i] = (NT[i] - lo) / (hi - lo);
+    return NT;
+  }
+  function nsample(u, v) {
+    const x0 = Math.floor(u), y0 = Math.floor(v), fx = u - x0, fy = v - y0;
+    const xa = x0 & 255, xb = (x0 + 1) & 255, ya = (y0 & 255) << 8, yb = ((y0 + 1) & 255) << 8;
+    const a = NT[ya + xa], b = NT[ya + xb], c = NT[yb + xa], d = NT[yb + xb];
+    return a + (b - a) * fx + (c - a + (a - b + d - c) * fx) * fy;
+  }
+  // the same noise as a translucent lavender stain, for mottling cloud bodies
+  function mottle() {
+    if (noiseCanvas) return noiseCanvas;
+    noiseTile();
+    noiseCanvas = document.createElement("canvas");
+    noiseCanvas.width = noiseCanvas.height = NS;
+    const g = noiseCanvas.getContext("2d");
+    const img = g.createImageData(NS, NS);
+    for (let i = 0; i < NT.length; i++) {
+      img.data[i * 4] = 150; img.data[i * 4 + 1] = 150; img.data[i * 4 + 2] = 198;
+      img.data[i * 4 + 3] = clamp((NT[i] - 0.42) * 2.2, 0, 1) * 255;
+    }
+    g.putImageData(img, 0, 0);
+    return noiseCanvas;
+  }
+
+  // A cumulus built like the real thing: big billows along a dome, smaller billows budding off
+  // their tops (two generations), all sitting on a flat base. Each billow is lit from the upper
+  // left and casts a soft contact shadow onto the billows behind it, which is what draws the
+  // crevices. Then: lavender body, dawn-peach underside, faint mottling, feathered base, slight blur.
+  function cloudSprite(w, seed, o = {}) {
+    const r = rng(seed);
+    const tall = o.tall ?? 1;
+    const puffs = [];
+    const n = (o.n ?? 6) + Math.floor(r() * 4);
+    for (let i = 0; i < n; i++) {
+      const t = 0.1 + 0.8 * (i + 0.2 + r() * 0.6) / n;
+      const dome = Math.sin(Math.PI * t);
+      const rad = (0.065 + 0.07 * dome * tall) * (0.8 + 0.4 * r());
+      puffs.push({ x: t, y: -rad * 0.62 - 0.08 * dome * tall * (0.5 + 0.5 * r()), rad, lvl: 0 });
+    }
+    for (let lvl = 0; lvl < 2; lvl++) {
+      for (const p of puffs.filter(q => q.lvl === lvl)) {
+        const kids = lvl === 0 ? 2 + Math.floor(r() * 3) : 2 + Math.floor(r() * 2);
+        for (let j = 0; j < kids; j++) {
+          const a = -Math.PI * (0.14 + 0.72 * r());
+          const d = p.rad * (0.55 + 0.2 * r());
+          puffs.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d * 0.85, rad: p.rad * (0.4 + 0.17 * r()), lvl: lvl + 1 });
+        }
+      }
+    }
+    const floor = { y: -0.015, ry: 0.035 };   // where the flat base sits, and how soft it is
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = floor.y + floor.ry;
+    for (const p of puffs) {
+      minX = Math.min(minX, p.x - p.rad); maxX = Math.max(maxX, p.x + p.rad);
+      minY = Math.min(minY, p.y - p.rad); maxY = Math.max(maxY, p.y + p.rad);
+    }
+    const soft = o.blur ?? 0.7;
+    const pad = Math.ceil(4 + soft * 3);
+    const s = (w - 2 * pad) / (maxX - minX);
+    const h = (maxY - minY) * s + 2 * pad;
+    const X = x => pad + (x - minX) * s, Y = y => pad + (y - minY) * s;
+    const baseY = Y(floor.y);
+
+    const work = document.createElement("canvas");
+    work.width = Math.ceil(w * dpr);
+    work.height = Math.ceil(h * dpr);
+    const g = work.getContext("2d");
+    g.scale(dpr, dpr);
+
+    const shadowed = (cx, cy, R) => {
+      const sx = cx + R * 0.05, sy = cy + R * 0.12;
+      const sg = g.createRadialGradient(sx, sy, R * 0.9, sx, sy, R * 1.24);
+      sg.addColorStop(0, "rgba(150,150,200,0.3)");
+      sg.addColorStop(1, "rgba(150,150,200,0)");
+      g.globalCompositeOperation = "source-atop";
+      g.fillStyle = sg;
+      g.fillRect(cx - R * 1.4, cy - R * 1.4, R * 2.8, R * 2.8);
+      g.globalCompositeOperation = "source-over";
+    };
+    const sphere = (cx, cy, R) => {
+      const lx = cx - R * 0.32, ly = cy - R * 0.5;
+      const gr = g.createRadialGradient(lx, ly, 0, lx, ly, R * 1.6);
+      gr.addColorStop(0, "#ffffff");
+      gr.addColorStop(0.5, "rgb(252,251,253)");
+      gr.addColorStop(0.8, "rgb(238,237,247)");
+      gr.addColorStop(1, "rgb(222,222,240)");
+      g.fillStyle = gr;
+      // a lumpy circle: two low harmonics break the perfect arc without looking jagged
+      const f1 = 3 + Math.floor(r() * 3), f2 = 6 + Math.floor(r() * 4), p1 = r() * 6.3, p2 = r() * 6.3;
+      const seg = clamp(Math.round(R * dpr * 0.9), 32, 160);
+      g.beginPath();
+      for (let k = 0; k <= seg; k++) {
+        const a = (k / seg) * Math.PI * 2;
+        const rr = R * (1 + 0.035 * Math.sin(f1 * a + p1) + 0.02 * Math.sin(f2 * a + p2));
+        k ? g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr) : g.moveTo(cx + rr, cy);
+      }
+      g.fill();
+    };
+
+    // back to front: the highest billows first, so lower ones overlap them and shade the joins
+    puffs.sort((a, b) => a.y - b.y);
+    for (const p of puffs) {
+      const cx = X(p.x), cy = Y(p.y), R = p.rad * s;
+      shadowed(cx, cy, R);
+      sphere(cx, cy, R);
+    }
+
+    g.globalCompositeOperation = "source-atop";
+    // body: lavender through the middle, dawn light warming the underside
+    const body = g.createLinearGradient(0, pad, 0, baseY + floor.ry * s);
+    body.addColorStop(0, "rgba(255,255,255,0)");
+    body.addColorStop(0.45, "rgba(214,214,238,0.12)");
+    body.addColorStop(0.7, "rgba(206,206,234,0.38)");
+    body.addColorStop(0.82, `rgba(244,190,160,${(o.warm ?? 0.5) * 0.7})`);
+    body.addColorStop(1, `rgba(246,184,150,${o.warm ?? 0.5})`);
+    g.fillStyle = body;
+    g.fillRect(0, 0, w, h);
+    // faint mottling so large billows aren't perfectly smooth
+    const pat = g.createPattern(mottle(), "repeat");
+    pat.setTransform(new DOMMatrix().translate(r() * NS, r() * NS).scale(1.4 + 0.6 * r(), 0.9 + 0.3 * r()));
+    g.globalAlpha = o.mottle ?? 0.1;
+    g.fillStyle = pat;
+    g.fillRect(0, 0, w, h);
+    g.globalAlpha = 1;
+    if (o.haze) {
+      g.fillStyle = `rgba(170,198,232,${o.haze})`;
+      g.fillRect(0, 0, w, h);
+    }
+    // feather the base
+    g.globalCompositeOperation = "destination-out";
+    const fadeFrom = baseY - floor.ry * s * 2.2;
+    const base = g.createLinearGradient(0, fadeFrom, 0, baseY + floor.ry * s * 1.2);
+    base.addColorStop(0, "rgba(0,0,0,0)");
+    base.addColorStop(1, "rgba(0,0,0,0.95)");
+    g.fillStyle = base;
+    g.fillRect(0, fadeFrom, w, h);
+    g.globalCompositeOperation = "source-over";
+
+    if (!soft) return { cv: work, w, h };
+    const cv = document.createElement("canvas");
+    cv.width = work.width;
+    cv.height = work.height;
+    const fg2 = cv.getContext("2d");
+    fg2.filter = `blur(${soft * dpr}px)`;
+    fg2.drawImage(work, 0, 0);
+    return { cv, w, h };
+  }
+
+  function midpoint(n, seed, rough) {
+    const r = rng(seed);
+    const a = new Float32Array(n + 1);
+    a[0] = r(); a[n] = r();
+    for (let step = n, s = 1; step > 1; step /= 2, s *= rough) {
+      for (let i = step / 2; i < n; i += step) a[i] = (a[i - step / 2] + a[i + step / 2]) / 2 + (r() - 0.5) * s;
+    }
+    let lo = Infinity, hi = -Infinity;
+    for (const v of a) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    return a.map(v => (v - lo) / (hi - lo || 1));
+  }
+
+  // Olympus at dawn, painted per pixel once per resize. Three ranges, far to near. Each has a
+  // jagged fractal crest; faces turned toward the sun (left) are warm, the rest lavender shade;
+  // gullies run down the fall line; the crest catches a thin rim of sunrise; the high summits
+  // keep some snow; everything fades into haze toward the sea of clouds.
+  function buildRidges() {
+    const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+    const cv = document.createElement("canvas");
+    cv.width = pw; cv.height = ph;
+    const g = cv.getContext("2d");
+    const tmp = document.createElement("canvas");
+    tmp.width = pw; tmp.height = ph;
+    const tg = tmp.getContext("2d");
+    noiseTile();
+
+    const sunX = pw * 0.22;
+    const rimCol = [255, 232, 198], snowLit = [255, 247, 240], snowShade = [208, 212, 238];
+    const layers = [
+      { seed: 5, base: 0.82, amp: 0.15, rough: 0.6, alpha: 0.5, fade: 0.85, tex: 0.25, rim: 0.4,
+        peaks: [[0.44, 0.08, 0.7], [0.6, 0.1, 0.95], [0.9, 0.09, 0.75]],
+        lit: [226, 216, 232], shade: [196, 200, 230], haze: [232, 224, 238] },
+      { seed: 3, base: 0.86, amp: 0.3, rough: 0.63, alpha: 0.78, fade: 0.8, tex: 0.55, rim: 1, snow: 0.8,
+        peaks: [[0.2, 0.13, 1], [0.33, 0.07, 0.6], [0.8, 0.12, 0.66], [0.94, 0.06, 0.48]],
+        lit: [230, 212, 226], shade: [166, 174, 218], haze: [230, 220, 236] },
+      { seed: 9, base: 0.9, amp: 0.2, rough: 0.64, alpha: 0.82, fade: 0.78, tex: 0.7, rim: 0.8,
+        peaks: [[0.06, 0.09, 0.8], [0.52, 0.08, 0.42], [0.68, 0.11, 0.9]],
+        lit: [224, 204, 218], shade: [152, 158, 204], haze: [238, 224, 230] },
+    ];
+
+    const K = 8;
+    for (const L of layers) {
+      const n = 2048;
+      const nz = midpoint(n, L.seed, L.rough);
+      const crag = midpoint(n, L.seed + 100, 0.72);
+      const ridge = new Float32Array(pw), hgt = new Float32Array(pw);
+      let top = Infinity;
+      for (let x = 0; x < pw; x++) {
+        const t = x / (pw - 1);
+        let env = 0.06;
+        for (const [px, wd, ht] of L.peaks) env = Math.max(env, ht * Math.exp(-((t - px) ** 2) / (2 * wd * wd)));
+        const fi = t * n, i0 = Math.min(n - 1, fi | 0), f = fi - i0;
+        const cr = crag[i0] + (crag[i0 + 1] - crag[i0]) * f - 0.5;
+        hgt[x] = env * (0.76 + 0.32 * (nz[i0] + (nz[i0 + 1] - nz[i0]) * f)) + cr * 0.05 * (0.3 + env);
+        ridge[x] = (L.base - L.amp * hgt[x]) * ph;
+        top = Math.min(top, ridge[x]);
+      }
+      // crest slope measured over windows of 1, 2, 4 … 128 css px: deeper pixels use wider
+      // windows, so small crags only shade the crest and big spurs carry far down the face
+      const slopes = [];
+      for (let k = 0; k < K; k++) {
+        const wpx = Math.max(1, Math.round((1 << k) * dpr));
+        const sl = new Float32Array(pw);
+        for (let x = 0; x < pw; x++) {
+          const a = Math.max(0, x - wpx), b = Math.min(pw - 1, x + wpx);
+          sl[x] = (ridge[b] - ridge[a]) / (b - a || 1);
+        }
+        slopes.push(sl);
+      }
+
+      const yTop = Math.max(0, Math.floor(top));
+      const yBot = Math.min(ph, Math.ceil(ph * 0.92));   // below this the sea of clouds covers everything
+      if (yBot <= yTop) continue;
+      const rows = yBot - yTop;
+      const img = tg.createImageData(pw, rows);
+      const px = img.data;
+      const crest = (L.base - L.amp) * ph, span = L.amp * ph;
+      const rimW = 1.8 * dpr;
+      const [sR, sG, sB] = L.shade, [lR, lG, lB] = L.lit, [hR, hG, hB] = L.haze;
+
+      // per column: fall-line direction, nearness to the sun, how much snow the summit holds here
+      const fall = new Float32Array(pw), sunNear = new Float32Array(pw), snowCap = new Float32Array(pw);
+      for (let x = 0; x < pw; x++) {
+        fall[x] = clamp(slopes[5][x], -1.3, 1.3) * 0.7;
+        sunNear[x] = L.rim * (0.45 + 0.55 * Math.exp(-(((x - sunX) / (pw * 0.28)) ** 2)));
+        snowCap[x] = L.snow ? clamp((hgt[x] - L.snow) / 0.24, 0, 1) * span * 0.24 : 0;
+      }
+      // per depth below the crest: which pair of slope windows to blend
+      const k0L = new Uint8Array(rows + 2), fkL = new Float32Array(rows + 2);
+      for (let d = 0; d < rows + 2; d++) {
+        const lv = Math.min(K - 1.001, Math.log2(1 + (d / dpr) * 0.6));
+        k0L[d] = lv | 0;
+        fkL[d] = lv - (lv | 0);
+      }
+
+      for (let j = 0; j < rows; j++) {
+        const y = yTop + j;
+        const hzr = clamp((y - crest) / span, 0, 1);
+        const haze = hzr * (0.85 + 0.15 * hzr), hz = haze * 0.75, texAmt = 1 - haze * 0.6;
+        const alphaRow = L.alpha * (1 - L.fade * hzr * Math.sqrt(hzr));
+        const gv = (y / dpr) * 1.1;
+        let i = j * pw * 4;
+        for (let x = 0; x < pw; x++, i += 4) {
+          const y0 = ridge[x];
+          if (y + 1 <= y0) continue;
+          const cover = y0 > y ? y + 1 - y0 : 1;
+          const d = y > y0 ? y - y0 : 0, dc = d / dpr;
+          const k0 = k0L[d | 0], fk = fkL[d | 0];
+          const a0 = slopes[k0][x];
+          const lit = clamp(-(a0 + (slopes[k0 + 1][x] - a0) * fk) * 1.7, -1, 1);
+          // gullies: streaky noise sheared along the fall line, fading out in the haze
+          const nv = nsample((x / dpr - dc * fall[x]) * 0.55 + L.seed * 41, dc * 0.1 + L.seed * 17);
+          const spur = 1 - Math.abs(nv * 2 - 1);                    // sharp ridges between soft gullies
+          const tex = spur * spur * 2 - 0.7 + (nv - 0.5) * 0.6;
+          const grit = nsample((x / dpr) * 2.2, gv) - 0.5;
+          const sh = clamp(0.48 + 0.42 * lit + (L.tex * 0.42 * tex + 0.14 * grit) * texAmt, 0, 1);
+          let R = sR + (lR - sR) * sh, G = sG + (lG - sG) * sh, B = sB + (lB - sB) * sh;
+          let snowA = 0;
+
+          const cap = snowCap[x];
+          if (cap > 0) {
+            const reach = cap * (0.55 + 0.9 * (tex * 0.5 + 0.5));
+            const snow = clamp((reach - d) / (reach * 0.5 + 1), 0, 1) * clamp(0.75 + tex * 0.9, 0, 1);
+            if (snow > 0) {
+              snowA = snow;
+              const ls = (lit + 1) / 2, k = snow * 0.85;
+              R += (snowShade[0] + (snowLit[0] - snowShade[0]) * ls - R) * k;
+              G += (snowShade[1] + (snowLit[1] - snowShade[1]) * ls - G) * k;
+              B += (snowShade[2] + (snowLit[2] - snowShade[2]) * ls - B) * k;
+            }
+          }
+          if (d < rimW) {
+            const rim = (1 - d / rimW) * sunNear[x] * (0.35 + 0.65 * (lit > 0 ? lit : 0));
+            R += (rimCol[0] - R) * rim; G += (rimCol[1] - G) * rim; B += (rimCol[2] - B) * rim;
+          }
+          R += (hR - R) * hz; G += (hG - G) * hz; B += (hB - B) * hz;
+
+          px[i] = R; px[i + 1] = G; px[i + 2] = B;
+          px[i + 3] = 255 * cover * (alphaRow > snowA * 0.9 ? alphaRow : snowA * 0.9);
+        }
+      }
+      tg.clearRect(0, 0, pw, ph);
+      tg.putImageData(img, 0, yTop);
+      g.drawImage(tmp, 0, 0);
+    }
+    return cv;
+  }
+
+  function build() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    for (const c of [bg, fg]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const s = clamp(W / 1280, 0.6, 1.3);
+    const density = clamp(W / 1280, 0.6, 1.4);
+    const r = rng(42);
+    ridges = buildRidges();
+
+    ambient = [];
+    const far = Math.round(5 * density), mid = Math.round(4 * density);
+    for (let i = 0; i < far; i++) {
+      const sp = cloudSprite((150 + r() * 110) * s, 100 + i, { haze: 0.28, warm: 0.35, tall: 0.6, blur: 1.1, mottle: 0.06 });
+      ambient.push({ sp, x: r() * (W + sp.w) - sp.w, y: H * (0.04 + r() * 0.36), v: 3 + r() * 2, a: 0.7 });
+    }
+    for (let i = 0; i < mid; i++) {
+      const sp = cloudSprite((250 + r() * 150) * s, 200 + i, { haze: 0.06, warm: 0.45, tall: 0.9 });
+      ambient.push({ sp, x: r() * (W + sp.w) - sp.w, y: H * (0.08 + r() * 0.5), v: 7 + r() * 4, a: 0.92 });
+    }
+    ambient.sort((a, b) => a.v - b.v);
+
+    // the sea of clouds Olympus rises out of
+    sea = [];
+    const sw = 440 * s, step = sw * 0.42;
+    const count = Math.ceil(W / step) + 3;
+    seaSpan = count * step;
+    for (let i = 0; i < count; i++) {
+      const sp = cloudSprite(sw * (0.85 + r() * 0.3), 300 + i, { warm: 0.6, tall: 0.6, n: 10 });
+      sea.push({ sp, x: -sw + i * step, y: H * 0.84 - sp.h * 0.55 + (r() - 0.5) * sp.h * 0.25, v: 4 });
+    }
+    seaGrad = bctx.createLinearGradient(0, H * 0.8, 0, H);
+    seaGrad.addColorStop(0, "rgba(255,240,229,0)");
+    seaGrad.addColorStop(0.45, "rgba(255,240,229,.85)");
+    seaGrad.addColorStop(1, "rgba(255,244,236,1)");
+
+    // the veil: eight clouds that rest at the edges and close over the quote
+    const stageW = Math.min(document.getElementById("stage").clientWidth || 600, 720);
+    const cw = clamp(stageW * 0.72, 240, 560);
+    const vr = rng(7);
+    veil = [];
+    for (let i = 0; i < 8; i++) {
+      veil.push({
+        side: i < 4 ? -1 : 1,
+        k: i % 4,
+        delay: vr() * 0.18,
+        phase: vr() * Math.PI * 2,
+        jx: vr() - 0.5,
+        jy: vr() - 0.5,
+        sp: cloudSprite(cw * (0.88 + vr() * 0.24), 500 + i, { warm: 0.55, tall: 1 }),
+      });
+    }
+  }
+
+  function veilPos(c, t, now) {
+    const sp = c.sp;
+    const margin = Math.max(0, (W - Math.min(W, 780)) / 2);
+    const peek = Math.min(sp.w * 0.32, Math.max(0, margin - 12));
+    const restX = c.side < 0 ? peek - sp.w / 2 : W - peek + sp.w / 2;
+    const restY = H * (0.2 + 0.17 * c.k) + c.jy * 30;
+
+    const rows = [-0.14, 0.06, 0.26, 0.46];   // biased low so the "You wrote" line above stays clear
+    const closedX = target.cx + c.side * target.w * (0.17 + 0.1 * (c.k % 2)) + c.jx * 30;
+    const closedY = target.cy + rows[c.k] * Math.max(target.h, 170) + c.jy * 16;
+
+    const local = ease(clamp((t - c.delay) / 0.82, 0, 1));
+    const bob = Math.sin(now * 0.0007 + c.phase);
+    return {
+      x: lerp(restX, closedX, local) + bob * 5 * local,
+      y: lerp(restY, closedY, local) + bob * 5,
+    };
+  }
+
+  function draw(now, dt) {
+    wind += (windTarget - wind) * Math.min(1, dt * 1.5);
+
+    bctx.clearRect(0, 0, W, H);
+    bctx.globalAlpha = 1;
+    bctx.drawImage(ridges, 0, 0, W, H);
+    for (const c of ambient) {
+      c.x += c.v * wind * dt;
+      if (c.x > W) c.x = -c.sp.w;
+      bctx.globalAlpha = c.a;
+      bctx.drawImage(c.sp.cv, c.x, c.y, c.sp.w, c.sp.h);
+    }
+    bctx.globalAlpha = 1;
+    bctx.fillStyle = seaGrad;
+    bctx.fillRect(0, H * 0.8, W, H * 0.2);
+    for (const c of sea) {
+      c.x += c.v * wind * dt;
+      if (c.x > W) c.x -= seaSpan;
+      bctx.drawImage(c.sp.cv, c.x, c.y, c.sp.w, c.sp.h);
+    }
+
+    const k = clamp((now - tween.t0) / tween.dur, 0, 1);
+    tween.value = lerp(tween.from, tween.to, k);
+    fctx.clearRect(0, 0, W, H);
+    for (const c of veil) {
+      const p = veilPos(c, tween.value, now);
+      if (p.x + c.sp.w / 2 < 0 || p.x - c.sp.w / 2 > W) continue;
+      fctx.drawImage(c.sp.cv, p.x - c.sp.w / 2, p.y - c.sp.h * 0.55, c.sp.w, c.sp.h);
+    }
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    draw(now, dt);
+    raf = requestAnimationFrame(loop);
+  }
+
+  function start() {
+    cancelAnimationFrame(raf);
+    if (motion.matches) {
+      draw(performance.now(), 0);
+    } else {
+      last = performance.now();
+      raf = requestAnimationFrame(loop);
+    }
+  }
+
+  function veilTo(to, dur) {
+    tween.from = tween.value;
+    tween.to = to;
+    tween.t0 = performance.now();
+    tween.dur = dur;
+  }
+
+  let rt = 0;
+  window.addEventListener("resize", () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => {
+      // ignore mobile address-bar jiggle
+      if (Math.abs(window.innerWidth - W) < 1 && Math.abs(window.innerHeight - H) < 120) return;
+      build();
+      start();
+    }, 150);
+  });
+  motion.addEventListener?.("change", start);
+
+  return {
+    init() { build(); start(); },
+    reduced: () => motion.matches,
+    gather(rect) {
+      target = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w: Math.max(rect.width, 320), h: rect.height };
+      windTarget = 2.6;
+      veilTo(1, 1100);
+    },
+    part() {
+      windTarget = 1;
+      veilTo(0, 1800);
+    },
+  };
+})();
+
+/* ═══════════════════════════ Interface ═══════════════════════════ */
+
+const $ = id => document.getElementById(id);
+const els = {
+  form: $("ask-form"), input: $("message"), count: $("count"), ask: $("ask"),
+  reply: $("reply"), lede: $("lede"), echo: $("echo"), echoText: $("echo-text"),
+  quote: $("quote"), quoteText: $("quote-text"), author: $("quote-author"), meta: $("quote-meta"),
+  copy: $("copy"), copyLabel: $("copy-label"), status: $("status"), announce: $("announce"),
+};
+const MAX = 1000;
+const fmt = n => n.toLocaleString("en-US");
+function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+let current = FIRST;
+let lastEcho = "";
+let busy = false;
+
+function sizeFor(text) {
+  const n = text.length;
+  return n <= 80 ? "xl" : n <= 170 ? "l" : n <= 320 ? "m" : "s";
+}
+
+function renderQuote(q) {
+  els.quote.classList.remove("is-error");
+  els.quote.dataset.size = sizeFor(q.text);
+  els.quoteText.textContent = q.text;
+  els.author.textContent = q.author;
+  els.meta.hidden = false;
+  els.announce.textContent = `${q.text} ${q.author}.`;
+}
+
+function renderError(msg) {
+  els.quote.classList.add("is-error");
+  els.quote.dataset.size = "m";
+  els.quoteText.textContent = msg;
+  els.meta.hidden = true;
+  els.announce.textContent = msg;
+}
+
+function showEcho(text) {
+  lastEcho = text;
+  els.lede.hidden = true;
+  els.echo.hidden = false;
+  els.echoText.textContent = text;
+  els.echoText.title = text;
+  els.echo.classList.remove("is-new");
+  void els.echo.offsetWidth;
+  els.echo.classList.add("is-new");
+}
+
+function updateCount() {
+  const n = els.input.value.length;
+  els.count.textContent = `${fmt(n)} / ${fmt(MAX)}`;
+  els.count.classList.toggle("is-near", n >= MAX * 0.9);
+  els.ask.disabled = busy || !els.input.value.trim();
+}
+
+function autosize() {
+  const el = els.input;
+  el.style.height = "auto";
+  let h = el.scrollHeight;
+  if (!el.value && el.placeholder) {         // size to the placeholder too, so a wrapped example never scrolls
+    el.value = el.placeholder;
+    h = el.scrollHeight;
+    el.value = "";
+  }
+  el.style.height = h + "px";
+}
+
+function restart(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+async function ask(text) {
+  busy = true;
+  els.ask.disabled = true;
+  els.form.setAttribute("aria-busy", "true");
+  showEcho(text);
+  els.input.value = "";
+  updateCount();
+  autosize();
+
+  const reduce = Sky.reduced();
+  els.quote.classList.remove("is-revealing");
+  els.quote.classList.add("is-veiled");
+  if (!reduce) Sky.gather(els.quote.getBoundingClientRect());
+  const statusTimer = setTimeout(() => els.status.classList.add("is-on"), reduce ? 0 : 450);
+  const minimum = wait(reduce ? 350 : 1600);   // let the clouds finish gathering even if the model is instant
+
+  let result = null, failure = "";
+  try {
+    result = await getQuote(text);
+  } catch (err) {
+    console.error(err);
+    failure = err instanceof TypeError
+      ? "Couldn't reach the server. Check that server.py is running, then try again."
+      : `Couldn't get a quote: ${err.message}.`;
+  }
+  await minimum;
+
+  clearTimeout(statusTimer);
+  els.status.classList.remove("is-on");
+  if (result) {
+    current = result;
+    renderQuote(result);
+  } else {
+    renderError(failure);
+  }
+
+  if (!reduce) {
+    Sky.part();
+    restart(els.reply, "is-glowing");
+    await wait(280);
+  }
+  els.quote.classList.remove("is-veiled");
+  restart(els.quote, "is-revealing");
+
+  busy = false;
+  els.form.removeAttribute("aria-busy");
+  updateCount();
+}
+
+els.form.addEventListener("submit", e => {
+  e.preventDefault();
+  const text = els.input.value.trim();
+  if (!text || busy) return;
+  ask(text.slice(0, MAX));
+});
+
+els.input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    els.form.requestSubmit();
+  }
+});
+els.input.addEventListener("input", () => { updateCount(); autosize(); });
+
+let copyTimer = 0;
+els.copy.addEventListener("click", async () => {
+  const payload = `“${current.text}” (${current.author})`;
+  clearTimeout(copyTimer);
+  try {
+    await navigator.clipboard.writeText(payload);
+    els.copy.classList.add("is-done");
+    els.copyLabel.textContent = "Copied";
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(els.quoteText);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    els.copyLabel.textContent = "Copy blocked, text selected";
+  }
+  copyTimer = setTimeout(() => {
+    els.copy.classList.remove("is-done");
+    els.copyLabel.textContent = "Copy";
+  }, 1800);
+});
+
+els.quote.addEventListener("animationend", e => {
+  if (e.target === els.quote.querySelector(".quote-meta")) els.quote.classList.remove("is-revealing");
+});
+
+// rotate example prompts through the placeholder while the box is empty and unfocused
+const EXAMPLES = [
+  "I'm nervous about my exam tomorrow.",
+  "Is it worth staying in a job I don't love?",
+  "How do I decide between two cities?",
+  "My roommate never does the dishes and I'm losing it.",
+  "What if clouds are just sky sheep?",
+];
+let ex = 0;
+setInterval(() => {
+  if (els.input.value || document.activeElement === els.input) return;
+  ex = (ex + 1) % EXAMPLES.length;
+  els.input.placeholder = EXAMPLES[ex];
+  autosize();
+}, 3800);
+window.addEventListener("resize", autosize);
+
+window.claude?.hot?.snapshot?.(() => ({ quote: current, echo: lastEcho }));
+
+function start(data = {}) {
+  if (data.quote) { current = data.quote; renderQuote(data.quote); }
+  if (data.echo) showEcho(data.echo);
+  updateCount();
+  autosize();
+  document.fonts?.ready.then(autosize);       // re-measure once the serif has loaded
+  Sky.init();
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>

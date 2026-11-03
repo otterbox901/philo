@@ -1,0 +1,20 @@
+# secrets
+.env
+kaggle.json
+
+# environments, caches, editor and tool state
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.idea/
+.playwright-mcp/
+
+# large or regenerable artifacts
+# - models/: produced by train.py; quote_index.pt is rebuilt automatically by main.py
+# - data/raw/: downloaded by scripts/data/fetch_raw.py (quotes_500k is 144 MB)
+# - data/gen/: raw Batch API requests and responses; the filtered pairs live in data/processed
+models/
+data/raw/*
+!data/raw/SOURCES.md
+data/gen/

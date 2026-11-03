@@ -1,0 +1,2 @@
+# Authors to exclude from the corpus even if they match Wikidata or the allowlist.
+# Format: Canonical Name | alias | alias   (one author per line; '#' starts a comment)

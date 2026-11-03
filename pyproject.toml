@@ -1,0 +1,10 @@
+[project]
+name = "philo"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas-stubs~=3.1.0",
+    "sentence-transformers>=6.2.0",
+    "torch>=2.15.0",
+    "transformers>=5.22.1",
+]
