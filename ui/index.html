@@ -34,7 +34,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Sky: CSS paints the dawn gradient, canvas paints mountains and clouds ── */
+/* ── Sky: CSS paints the dawn gradient, canvas paints mountains, marble statues and clouds ── */
 .sky, .veil {
   position: fixed;
   inset: 0;
@@ -687,6 +687,450 @@ const Sky = (() => {
     return a.map(v => (v - lo) / (hi - lo || 1));
   }
 
+  // ── Marble statues on columns ──
+  // Each statue is a list of parts in its own unit space (SVG path syntax, absolute M L C H V Z
+  // only), back to front. A part becomes a rounded volume: its distance to the edge, bent into a
+  // quarter circle of radius r, standing at depth z (s flattens the bulge). A front part replaces
+  // whatever is behind it, so an arm laid over the body leaves a small step. Folds are pressed in as
+  // soft grooves of [width, depth] (negative depth raises a ridge instead; a dot-length stroke makes
+  // a round bump). cx is where the column's axis meets the statue. The whole column and statue are
+  // carved as one height field and lit like the mountains.
+
+  // move an absolute SVG path (M L C H V Z) by dx, dy
+  function shiftPath(d, dx, dy) {
+    let cmd = "", isX = true;
+    return d.replace(/[A-Za-z]|-?[\d.]+/g, t => {
+      if (/[A-Za-z]/.test(t)) { cmd = t; isX = true; return t; }
+      let v = +t;
+      if (cmd === "H" || (cmd !== "V" && isX)) v += dx; else v += dy;
+      if (cmd !== "H" && cmd !== "V") isX = !isX;
+      return +v.toFixed(2);
+    });
+  }
+
+  // shapes used twice: Victory's far wing is her near wing set back, the Thinker's far shin his near one
+  const NIKE_WING = "M88 66C92 44 106 26 128 15C146 7 166 4 186 4C182 10 178 14 172 18L176 20C170 26 166 30 158 34L162 37C156 44 150 48 144 52L147 56C140 62 134 68 128 72L130 77C124 82 118 88 112 92L113 98C108 100 104 100 100 100C94 96 89 82 88 66Z";
+  const THINKER_SHIN = "M100 104C108 102 116 100 117 106C117 120 114 136 113 150C118 154 126 157 130 161C132 164 130 166 126 166L100 166C95 166 93 162 95 156C97 148 96 142 94 134C91 124 92 112 100 104Z";
+
+  const STATUES = {
+    // Rodin's Thinker, seen from his right: hunched on the rock, chin on the back of his hand, elbow on his knee
+    thinker: {
+      w: 142, h: 190, cx: 66,
+      parts: [
+        { r: 3, z: 0, d: "M6 176H136V190H6Z" },
+        { r: 10, z: 0, d: "M10 176C9 160 10 140 13 124C14 118 20 114 30 113C44 112 58 112 66 114C72 120 76 132 82 144C86 150 96 156 110 158C122 159 132 162 134 168L136 176Z" },
+        { r: 9, z: 3, d: shiftPath(THINKER_SHIN, 7, 0) },
+        { r: 22, z: 2, d: "M28 106C20 98 17 84 19 70C21 54 32 38 48 30C58 25 70 23 78 26C84 30 88 38 87 46C86 56 82 66 76 76C70 84 62 90 50 94C40 98 34 104 28 106Z" },
+        { r: 13, z: 6, d: "M30 92C50 88 80 84 104 84C112 84 118 90 118 98C118 104 114 108 106 108C90 110 64 113 40 114C30 114 22 110 22 102C22 96 25 93 30 92Z" },
+        { r: 9, z: 10, d: THINKER_SHIN },
+        { r: 6, z: 12, d: "M72 26C78 22 86 26 90 34C92 40 90 46 86 46C80 44 74 38 72 32Z" },
+        { r: 9, z: 16, d: "M84 16C92 11 102 14 106 22C108 26 108 29 108 31C110 34 111 37 109 38C107 40 106 42 104 44C102 47 98 48 94 46C88 44 82 38 80 30C79 24 80 19 84 16Z" },
+        { r: 9, z: 14, d: "M60 34C64 28 72 28 78 32C86 40 94 56 102 72C106 80 104 88 98 88C92 88 88 80 84 72C78 62 70 54 62 48C58 44 58 38 60 34Z" },
+        { r: 7, z: 18, d: "M94 82C94 72 96 62 100 54C102 50 108 50 110 54C112 62 110 74 106 84C104 90 96 90 94 82Z" },
+        { r: 4, z: 20, d: "M98 50C100 44 106 41 112 42C116 44 116 50 114 54C112 58 104 58 100 56C98 55 97 52 98 50Z" },
+      ],
+      folds: [
+        [3, 1.6, "M20 140C30 146 40 150 52 150M60 122C64 134 70 144 78 150M16 160C24 162 32 166 36 172"],
+        [4, 1.4, "M66 34C70 40 74 46 78 54"],
+        [5, 1.2, "M30 50C26 62 24 76 26 92"],
+        [4, -1.4, "M44 36C40 44 38 52 40 60"],
+        [8, -1.6, "M114 96L114.1 96"],
+        [2.6, 1.2, "M98 112C96 122 96 132 98 142"],
+        [1.4, 0.8, "M122 160L126 165M117 159L120 165"],
+        [1.8, 0.9, "M84 18C86 16 88 16 90 18M90 15C92 13 94 13 96 15M96 15C98 14 100 15 101 17M82 24C83 22 85 21 87 22M86 22C87 20 89 20 91 21"],
+        [3, -1.2, "M100 21C103 23 105 26 106 29"],
+        [2.4, 1.4, "M100 30C102 30 103 31 104 32"],
+        [2.2, 1.2, "M88 28C86 30 86 33 88 35"],
+        [1.4, 0.8, "M104 46L108 50M101 48L104 53"],
+      ],
+    },
+
+    // Venus de Milo: both arms broken, the himation slipping off her hips, her left knee bent forward
+    venus: {
+      w: 90, h: 228, cx: 45,
+      parts: [
+        { r: 3, z: 0, d: "M14 214H76V228H14Z" },
+        { r: 3, z: 1, d: "M18 206H72V215H18Z" },
+        { r: 4, z: 12, d: "M52 3C56 1 61 3 61 7C61 11 58 13 55 12Z" },
+        { r: 6, z: 12, d: "M41 27L52 27L53 41L40 42Z" },
+        { r: 18, z: 6, d: "M20 48C28 44 35 42 40 40L53 39C59 39 64 40 68 43C68 50 65 58 63 66C61 74 58 80 58 88C59 94 62 100 66 108L64 124L22 124L18 110C19 104 24 96 28 88C28 78 26 70 24 62C22 56 20 52 20 48Z" },
+        { r: 6, z: 10, d: "M16 46C22 43 28 46 28 53L27 68L15 64C14 58 13 51 16 46Z" },
+        { r: 6, z: 10, d: "M61 42C67 37 73 39 76 43L78 50L67 55C63 52 61 47 61 42Z" },
+        { r: 16, z: 4, d: "M18 106C26 114 36 119 46 118C54 117 61 112 66 104C70 116 74 132 76 148C77 162 74 178 73 192L72 206L16 206C14 190 13 172 14 156C15 136 16 120 18 106Z" },
+        { r: 2, z: 8, d: "M58 200C62 198 70 198 72 202L72 206L58 206Z" },
+        { r: 8, z: 16, d: "M47 5C53 5 56 10 56 16C56 23 53 29 47 32C41 30 38 23 38 16C38 10 41 5 47 5Z" },
+        { r: 3.5, z: 19, d: "M38 17C37 9 42 3 48 3C54 3 58 8 57 16C55 12 52 10 47 10C43 10 40 13 38 17Z" },
+      ],
+      folds: [
+        [6, -2.4, "M20 108C28 115 37 120 46 119C54 118 61 113 66 106"],
+        [10, -2.4, "M64 112L64.2 112.2"],
+        [4, 2.4, "M22 124C20 150 19 176 20 202M28 122C27 150 27 176 28 202M34 122C35 146 36 174 36 202"],
+        [4, 2, "M44 122C50 134 56 144 60 150M68 120C66 132 64 142 62 150M48 162C52 174 54 188 54 202M66 162C66 176 66 190 64 202"],
+        [16, -3, "M62 150L62.2 150.2"],
+        [12, -2.2, "M34 64L34.1 64M55 62L55.1 62"],
+        [2, 1, "M45 96L45.1 96.3"],
+        [8, 0.8, "M45 76L45 92"],
+        [2.2, 1, "M42.5 16C43.5 15.5 45 15.5 45.5 16M50 16C50.5 15.5 52 15.5 53 16"],
+        [2, -1, "M48 17L48.2 23"],
+        [1.4, 0.8, "M41 9C43 7 45 6 48 6M55 8C53 6 51 6 48 6"],
+      ],
+    },
+
+    // the Winged Victory of Samothrace, striding into the wind, wings swept back
+    nike: {
+      w: 188, h: 262, cx: 86,
+      parts: [
+        { r: 3, z: 0, d: "M26 248H152V262H26Z" },
+        { r: 3, z: 1, d: "M30 240H148V249H30Z" },
+        { r: 9, s: 0.45, z: 0, d: shiftPath(NIKE_WING, -16, -6) },
+        { r: 16, z: 2, d: "M70 114C86 110 104 112 120 120C136 130 148 146 152 164C156 184 150 204 144 220C142 228 140 234 138 240L110 240C106 232 100 226 94 222C86 226 76 232 70 238L52 238C54 222 56 204 58 186C60 164 62 142 64 126C65 120 67 116 70 114Z" },
+        { r: 3, z: 4, d: "M108 236C112 230 120 230 128 234L132 240L106 240Z" },
+        { r: 11, z: 7, d: "M68 116C80 112 92 116 94 126C94 142 88 160 80 176C74 190 70 206 66 222L64 238L50 238C52 222 54 204 56 188C58 168 60 148 62 132C63 124 65 118 68 116Z" },
+        { r: 3, z: 10, d: "M36 234C40 228 52 228 62 230L68 240L36 240Z" },
+        { r: 20, z: 8, d: "M74 50C64 56 56 66 56 78C56 88 60 98 64 108C66 114 68 118 70 120L106 118C102 108 100 98 101 88C102 78 106 70 104 62C100 54 92 50 86 50C80 50 76 50 74 50Z" },
+        { r: 5, z: 14, d: "M84 52C90 51 96 54 97 60C98 65 95 69 90 69C85 69 82 64 82 60C82 56 82 54 84 52Z" },
+        { r: 6, z: 12, d: "M72 44C74 40 80 38 85 40L87 54L71 55Z" },
+        { r: 9, s: 0.45, z: 18, d: NIKE_WING },
+      ],
+      folds: [
+        [3, 1.4, "M96 62C106 42 124 26 150 16M102 74C114 56 132 42 160 28"],
+        [2.6, 1.6, "M104 84L172 20M106 90L158 36M108 94L144 54M110 97L128 74"],
+        [3.4, 2, "M64 70C70 80 76 92 82 104M60 86C66 94 72 102 78 112M72 60C78 66 84 72 88 80"],
+        [5, -1.8, "M60 96C74 100 90 100 104 96"],
+        [3, 1.8, "M68 132C66 152 62 176 58 200M80 128C84 142 82 160 76 182M88 132C84 152 76 172 70 196"],
+        [4, 2.4, "M98 122C118 136 134 156 144 184M110 120C128 130 142 146 150 166M98 150C104 174 110 198 116 224M118 162C124 184 128 206 128 230M134 178C138 196 140 214 138 232"],
+      ],
+    },
+
+    // Myron's Discobolus: crouched and twisting, right arm swung back with the discus, left hand at the right knee
+    discobolus: {
+      w: 146, h: 186, cx: 66,
+      parts: [
+        { r: 3, z: 0, d: "M6 172H138V186H6Z" },
+        { r: 3, z: 1, d: "M10 164H134V173H10Z" },
+        { r: 2.5, s: 0.4, z: 12, d: "M133 3C140 3 145 7 145 12C145 17 140 21 133 21C126 21 121 17 121 12C121 7 126 3 133 3Z" },
+        { r: 9, z: 2, d: "M78 96C90 100 100 112 108 124C112 132 116 140 120 148C124 154 128 160 128 164L114 164C114 158 112 154 108 150C102 142 96 136 90 130C82 122 76 112 74 104Z" },
+        { r: 16, z: 4, d: "M28 66C28 58 36 52 48 46C58 40 66 34 74 33C82 34 86 42 85 52C84 62 84 74 87 84C92 92 96 100 92 106C86 112 76 110 70 104C64 98 58 92 52 86C44 82 36 80 30 74C28 72 28 69 28 66Z" },
+        { r: 11, z: 8, d: "M82 94C74 90 58 94 44 100C34 104 24 106 24 112C24 120 32 122 38 120C52 116 66 114 78 110C86 106 88 98 82 94Z" },
+        { r: 8, z: 10, d: "M24 112C28 108 38 108 40 114C42 124 42 136 40 148L40 156C36 158 30 158 28 156C28 144 26 132 24 122C23 118 23 114 24 112Z" },
+        { r: 3, z: 10, d: "M12 164C16 156 26 154 38 154C42 156 44 160 44 164Z" },
+        { r: 5, z: 10, d: "M40 44L50 41L57 52L45 57Z" },
+        { r: 8, z: 14, d: "M40 27C47 27 51 33 50 40C49 46 45 50 39 50C33 49 30 44 30 38C30 31 34 27 40 27Z" },
+        { r: 3, z: 17, d: "M30 37C30 30 35 25 41 25C47 25 51 29 51 35C48 31 44 29 40 29C35 29 32 32 30 37Z" },
+        { r: 6, z: 16, d: "M66 38C74 32 84 30 96 26C106 23 114 20 122 16C127 14 131 18 128 22C122 26 114 30 104 34C94 38 84 44 74 50C68 54 60 46 64 40Z" },
+        { r: 6, z: 14, d: "M28 60C34 58 38 64 36 72C34 80 30 88 30 96C32 102 32 108 28 112C22 112 18 106 20 100C20 90 22 78 22 70C22 64 24 60 28 60Z" },
+      ],
+      folds: [
+        [3, 1.3, "M38 66C48 60 58 52 70 44"],
+        [3, 1.3, "M54 74C62 80 70 90 78 100"],
+        [8, -1.4, "M28 114L28.1 114"],
+        [1.6, 0.8, "M34 31C36 29 38 28 40 28M42 27C44 26 46 27 48 28"],
+      ],
+    },
+  };
+
+  // An Ionic column in the same unit space, its capital's top at y = top and its axis at x = cx:
+  // abacus, two volutes joined by the canalis, an egg-and-dart echinus, a bead, then a fluted shaft
+  // `shaft` units tall that swells slightly (entasis) and widens toward its foot.
+  const CAPITAL = 32, CAP_HALF = 50;                  // capital height; half its width, with room for the volutes
+  function column(cx, top, shaft, seed) {
+    const f = v => +v.toFixed(2);
+    const rect = (x0, y0, x1, y1) => `M${f(x0)} ${f(y0)}H${f(x1)}V${f(y1)}H${f(x0)}Z`;
+    const circle = (x, y, R, c = R * 0.55) =>
+      `M${f(x)} ${f(y - R)}C${f(x + c)} ${f(y - R)} ${f(x + R)} ${f(y - c)} ${f(x + R)} ${f(y)}` +
+      `C${f(x + R)} ${f(y + c)} ${f(x + c)} ${f(y + R)} ${f(x)} ${f(y + R)}` +
+      `C${f(x - c)} ${f(y + R)} ${f(x - R)} ${f(y + c)} ${f(x - R)} ${f(y)}` +
+      `C${f(x - R)} ${f(y - c)} ${f(x - c)} ${f(y - R)} ${f(x)} ${f(y - R)}Z`;
+    const parts = [], folds = [];
+    const y0 = top + CAPITAL, y1 = y0 + shaft, ht = 27, hb = 31;   // half-widths at the neck and the foot
+
+    parts.push({ r: ht, z: 0, d: `M${f(cx - ht)} ${f(y0)}H${f(cx + ht)}C${f(cx + ht + 2.5)} ${f(y0 + shaft * 0.4)} ${f(cx + hb)} ${f(y0 + shaft * 0.75)} ${f(cx + hb)} ${f(y1)}H${f(cx - hb)}C${f(cx - hb)} ${f(y0 + shaft * 0.75)} ${f(cx - ht - 2.5)} ${f(y0 + shaft * 0.4)} ${f(cx - ht)} ${f(y0)}Z` });
+    // nine visible flutes, narrower and shallower as the shaft turns away
+    for (let i = -4; i <= 4; i++) {
+      const s = Math.sin(i * 0.36), c = Math.cos(i * 0.36);
+      folds.push([f(1.2 + 5 * c), f(2.2 * c), `M${f(cx + s * (ht - 3))} ${f(y0 + 4)}L${f(cx + s * (hb - 3))} ${f(y1)}`]);
+    }
+    // joints between the drums, arching up a little because we look up at them
+    for (let y = y0 + 70; y < y1 - 40; y += 74 + (seed * 13 + y) % 21) {
+      const w = ht + ((y - y0) / shaft) * (hb - ht);
+      folds.push([1.3, 0.8, `M${f(cx - w)} ${f(y + 1.5)}C${f(cx - w / 2)} ${f(y - 1)} ${f(cx + w / 2)} ${f(y - 1)} ${f(cx + w)} ${f(y + 1.5)}`]);
+    }
+    parts.push({ r: 2.5, z: 2, d: rect(cx - 30, top + 27, cx + 30, top + 32) });
+    parts.push({ r: 8, z: 3, d: `M${f(cx - 33)} ${f(top + 14)}H${f(cx + 33)}C${f(cx + 33)} ${f(top + 23)} ${f(cx + 28)} ${f(top + 28)} ${f(cx + 20)} ${f(top + 28)}H${f(cx - 20)}C${f(cx - 28)} ${f(top + 28)} ${f(cx - 33)} ${f(top + 23)} ${f(cx - 33)} ${f(top + 14)}Z` });
+    let eggs = "", darts = "";
+    for (let i = -2; i <= 2; i++) eggs += `M${f(cx + i * 11)} ${f(top + 17)}L${f(cx + i * 11)} ${f(top + 24)}`;
+    for (let i = -2; i < 2; i++) darts += `M${f(cx + i * 11 + 5.5)} ${f(top + 16)}L${f(cx + i * 11 + 5.5)} ${f(top + 26)}`;
+    folds.push([6, -1.4, eggs], [1.6, 1.2, darts]);
+    parts.push({ r: 4, z: 5, d: `M${f(cx - 40)} ${f(top + 7)}H${f(cx + 40)}V${f(top + 15)}C${f(cx + 20)} ${f(top + 18)} ${f(cx - 20)} ${f(top + 18)} ${f(cx - 40)} ${f(top + 15)}Z` });
+    for (const side of [-1, 1]) {
+      const vx = cx + side * 38, vy = top + 19, R = 12;
+      parts.push({ r: 6, z: 5, d: circle(vx, vy, R) });
+      let spiral = "";                                 // winds inward toward the eye, mirrored on the far side
+      for (let t = 0; t <= 2.6 * Math.PI; t += 0.2) {
+        const rr = R * 0.92 * (1 - t / (2.9 * Math.PI)), a = -Math.PI / 2 + side * t;
+        spiral += `${spiral ? "L" : "M"}${f(vx + Math.cos(a) * rr)} ${f(vy + Math.sin(a) * rr)}`;
+      }
+      folds.push([2, 1.5, spiral], [3, -1.2, `M${f(vx)} ${f(vy)}L${f(vx + 0.1)} ${f(vy)}`]);
+    }
+    parts.push({ r: 2.5, z: 7, d: rect(cx - 44, top, cx + 44, top + 7) });
+    return { parts, folds };
+  }
+
+  // A statue standing on its column, as one def for carveStatue. axis is the column's x in the result.
+  function mount(name, shaft) {
+    const s = STATUES[name];
+    const left = Math.max(CAP_HALF, s.cx), right = Math.max(CAP_HALF, s.w - s.cx), dx = left - s.cx;
+    const col = column(left, s.h, shaft, name.length);
+    return {
+      w: left + right,
+      h: s.h + CAPITAL + shaft,
+      axis: left,
+      parts: [...col.parts, ...s.parts.map(p => ({ ...p, d: shiftPath(p.d, dx, 0) }))],
+      folds: [...col.folds, ...s.folds.map(([w, depth, d]) => [w, depth, shiftPath(d, dx, 0)])],
+    };
+  }
+
+  // exact Euclidean distance transform (Felzenszwalb & Huttenlocher), one row or column at a time
+  const FAR = 1e20;
+  let ef = new Float64Array(0), ed = ef, ez = ef, ev = new Int32Array(0);
+  function edt1(n) {
+    let k = 0;
+    ev[0] = 0; ez[0] = -FAR; ez[1] = FAR;
+    for (let q = 1; q < n; q++) {
+      let s;
+      for (;;) {
+        const p = ev[k];
+        s = (ef[q] + q * q - ef[p] - p * p) / (2 * (q - p));
+        if (s > ez[k]) break;
+        k--;
+      }
+      k++; ev[k] = q; ez[k] = s; ez[k + 1] = FAR;
+    }
+    k = 0;
+    for (let q = 0; q < n; q++) {
+      while (ez[k + 1] < q) k++;
+      ed[q] = (q - ev[k]) ** 2 + ef[ev[k]];
+    }
+  }
+  // distance from each covered pixel to the nearest uncovered one; the crop's border counts as outside.
+  // Edge pixels start at their sub-pixel depth inside the shape (as in Mapbox's TinySDF), so a
+  // slanted edge's staircase doesn't print faint stripes along long, smooth parts like a thigh.
+  function distIn(px, w, h) {
+    const n = Math.max(w, h) + 2;
+    if (ef.length < n) { ef = new Float64Array(n); ed = new Float64Array(n); ez = new Float64Array(n + 1); ev = new Int32Array(n); }
+    const D = new Float32Array(w * h);
+    for (let x = 0; x < w; x++) {
+      ef[0] = ef[h + 1] = 0;
+      for (let y = 0; y < h; y++) {
+        const a = px[(y * w + x) * 4 + 3];
+        ef[y + 1] = a === 255 ? FAR : a > 128 ? ((a - 127.5) / 255) ** 2 : 0;
+      }
+      edt1(h + 2);
+      for (let y = 0; y < h; y++) D[y * w + x] = ed[y + 1];
+    }
+    for (let y = 0, o = 0; y < h; y++, o += w) {
+      ef[0] = ef[w + 1] = 0;
+      for (let x = 0; x < w; x++) ef[x + 1] = D[o + x];
+      edt1(w + 2);
+      for (let x = 0; x < w; x++) D[o + x] = Math.sqrt(ed[x + 1]);
+    }
+    return D;
+  }
+
+  function boxBlur(src, w, h, r) {
+    const tmp = new Float32Array(w * h), out = new Float32Array(w * h), n = 2 * r + 1;
+    for (let y = 0, o = 0; y < h; y++, o += w) {
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += src[o + clamp(k, 0, w - 1)];
+      for (let x = 0; x < w; x++) {
+        tmp[o + x] = s / n;
+        s += src[o + Math.min(w - 1, x + r + 1)] - src[o + Math.max(0, x - r)];
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += tmp[clamp(k, 0, h - 1) * w + x];
+      for (let y = 0; y < h; y++) {
+        out[y * w + x] = s / n;
+        s += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+      }
+    }
+    return out;
+  }
+
+  // bounding box of an absolute SVG path (M L C H V Z), control points included
+  function pathBounds(d) {
+    let cmd = "", isX = true, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const t of d.match(/[A-Za-z]|-?[\d.]+/g)) {
+      if (/[A-Za-z]/.test(t)) { cmd = t; isX = true; continue; }
+      const v = +t;
+      if (cmd === "H" || (cmd !== "V" && isX)) { x0 = Math.min(x0, v); x1 = Math.max(x1, v); }
+      else { y0 = Math.min(y0, v); y1 = Math.max(y1, v); }
+      if (cmd !== "H" && cmd !== "V") isX = !isX;
+    }
+    return [x0, y0, x1, y1];
+  }
+
+  // Carve one statue `hgt` css px tall. Lit like the ranges: warm low sun from the left, lavender
+  // sky in the shade, shadows found by marching toward the sun, crevices darkened by comparing each
+  // point with its blurred surroundings, then haze that thickens toward the base, which dissolves.
+  function carveStatue(def, hgt, o) {
+    const k = (hgt / def.h) * dpr;
+    const pw = Math.ceil(def.w * k), ph = Math.ceil(def.h * k), N = pw * ph;
+    const cv = document.createElement("canvas");
+    cv.width = pw; cv.height = ph;
+    const g = cv.getContext("2d", { willReadFrequently: true });
+
+    // paint one shape, read back just its box, and visit each covered pixel with its distance from the edge.
+    // smooth > 0 softens that distance by a box of that radius: a part's rounded profile is nearly vertical
+    // at its edge, so the pixel staircase of a slanted edge would otherwise show as ripples along it.
+    const each = (d, pad, smooth, paint, visit) => {
+      const [ux0, uy0, ux1, uy1] = pathBounds(d);
+      const bx = clamp(Math.floor((ux0 - pad) * k) - 2, 0, pw), by = clamp(Math.floor((uy0 - pad) * k) - 2, 0, ph);
+      const bw = clamp(Math.ceil((ux1 + pad) * k) + 2, 0, pw) - bx, bh = clamp(Math.ceil((uy1 + pad) * k) + 2, 0, ph) - by;
+      if (bw <= 0 || bh <= 0) return;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(bx, by, bw, bh);
+      g.setTransform(k, 0, 0, k, 0, 0);
+      paint(new Path2D(d));
+      const px = g.getImageData(bx, by, bw, bh).data;
+      let D = distIn(px, bw, bh);
+      if (smooth) D = boxBlur(boxBlur(D, bw, bh, smooth), bw, bh, smooth);
+      for (let y = 0; y < bh; y++) {
+        for (let x = 0, j = y * bw, i = (by + y) * pw + bx; x < bw; x++, j++, i++) {
+          const a = px[j * 4 + 3];
+          if (a) visit(i, a / 255, D[j]);
+        }
+      }
+    };
+
+    const Hf = new Float32Array(N), A = new Float32Array(N), smoothR = Math.max(1, Math.round(k));
+    for (const p of def.parts) {
+      const R = p.r * k, z = (p.z || 0) * k, s = p.s ?? 1;
+      each(p.d, 0, smoothR, path => g.fill(path), (i, a, D) => {
+        const t = 1 - Math.min(D, R) / R;
+        Hf[i] += (z + R * s * Math.sqrt(1 - t * t) - Hf[i]) * a;
+        A[i] = a + A[i] * (1 - a);
+      });
+    }
+    for (const [w, depth, d] of def.folds) {
+      const hw = (w * k) / 2, dep = depth * k;
+      each(d, w / 2 + 1, 0, path => {                 // a stroke reaches half its width past the path
+        g.lineWidth = w; g.lineCap = "round"; g.lineJoin = "round";
+        g.stroke(path);
+      }, (i, a, D) => {
+        if (A[i]) Hf[i] -= dep * (0.5 - 0.5 * Math.cos(Math.PI * Math.min(D, hw) / hw)) * a;
+      });
+    }
+
+    const H = boxBlur(boxBlur(Hf, pw, ph, 1), pw, ph, 1);
+    const aoR = Math.max(2, Math.round(5 * k));
+    const Hb = boxBlur(boxBlur(H, pw, ph, aoR), pw, ph, aoR);
+
+    let Lx = -0.78, Ly = -0.3, Lz = 0.55;
+    const ll = Math.hypot(Lx, Ly, Lz); Lx /= ll; Ly /= ll; Lz /= ll;
+    const lxy = Math.hypot(Lx, Ly), sx = Lx / lxy, sy = Ly / lxy, rise = Lz / lxy;
+    const march = 30 * k, soft = 1.5 * k, crease = 1 / (3 * k), acne = 0.4 * k;
+    const lit = [255, 242, 228], shade = [170, 172, 212], deep = [132, 134, 186], rimCol = [255, 222, 186];
+    const haze = o.haze, fadeFrom = ph * o.fadeFrom;
+
+    const out = g.createImageData(pw, ph), px = out.data;
+    for (let y = 1; y < ph - 1; y++) {
+      const fy = y / ph;
+      const hz = o.hazeTop + (o.hazeBottom - o.hazeTop) * fy * fy;
+      const fade = y > fadeFrom ? 1 - (y - fadeFrom) / (ph - fadeFrom) : 1;
+      for (let x = 1, i = y * pw + 1; x < pw - 1; x++, i++) {
+        const a = A[i];
+        if (!a) continue;
+        let nx = (H[i - 1] - H[i + 1]) * 0.5, ny = (H[i - pw] - H[i + pw]) * 0.5, nz = 1;
+        const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
+        const ndl = nx * Lx + ny * Ly + nz * Lz;
+        let sh = 0;
+        if (ndl > 0) {
+          const h0 = H[i];
+          for (let s = 1.5, st = 1.5; s < march; st *= 1.15, s += st) {
+            const qx = (x + sx * s + 0.5) | 0, qy = (y + sy * s + 0.5) | 0;
+            if (qx < 0 || qy < 0) break;
+            const over = H[qy * pw + qx] - h0 - s * rise - acne;   // a little bias so smooth curves don't shadow themselves
+            if (over > 0 && (sh = Math.max(sh, over / soft)) >= 1) { sh = 1; break; }
+          }
+        }
+        const light = clamp(0.16 + 1.1 * Math.max(0, ndl) * (1 - sh) + 0.12 * Math.max(0, -ny), 0, 1);
+        let R = shade[0] + (lit[0] - shade[0]) * light;
+        let G = shade[1] + (lit[1] - shade[1]) * light;
+        let B = shade[2] + (lit[2] - shade[2]) * light;
+        const oc = clamp((Hb[i] - H[i]) * crease, 0, 1) * 0.7;
+        R += (deep[0] - R) * oc; G += (deep[1] - G) * oc; B += (deep[2] - B) * oc;
+        const rim = clamp(-nx * (1 - nz) * 2.2, 0, 0.75) * (1 - sh);
+        R += (rimCol[0] - R) * rim; G += (rimCol[1] - G) * rim; B += (rimCol[2] - B) * rim;
+        R += (haze[0] - R) * hz; G += (haze[1] - G) * hz; B += (haze[2] - B) * hz;
+        const j = i * 4;
+        px[j] = R; px[j + 1] = G; px[j + 2] = B; px[j + 3] = 255 * a * fade;
+      }
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.putImageData(out, 0, 0);
+    return cv;
+  }
+
+  // Colossi on tall columns rising out of the sea of clouds, in the open sky between the veil's
+  // resting clouds and the quote. Each column leans a few degrees, as old columns settle. On each
+  // side a near column stands just behind the nearest range; when the gap is wide enough a smaller,
+  // hazier one stands farther in, behind the middle range, so the mountains hide its foot.
+  // Slots per side run from the screen edge inward. top is where the statue's head should reach.
+  const NEAR = { haze: [232, 224, 238], hazeTop: 0.14, hazeBottom: 0.5, fadeFrom: 0.8 };
+  const FARTHER = { ...NEAR, hazeTop: 0.3, hazeBottom: 0.62, fadeFrom: 0.78 };
+  const SLOTS = [
+    { side: -1, depth: "near", name: "thinker",    scale: 1,    tilt: -2.5, top: 0.16, foot: 0.87, tone: NEAR },
+    { side: -1, depth: "far",  name: "venus",      scale: 0.72, tilt: 3,    top: 0.27, foot: 0.84, tone: FARTHER },
+    { side: 1,  depth: "near", name: "nike",       scale: 1,    tilt: 2.5,  top: 0.13, foot: 0.87, tone: NEAR },
+    { side: 1,  depth: "far",  name: "discobolus", scale: 0.72, tilt: -3.5, top: 0.31, foot: 0.84, tone: FARTHER },
+  ];
+  // Carving depends only on size, so a resize that keeps the scale and height reuses the last set.
+  let carved = new Map(), carvedFor = "";
+  function placeStatues() {
+    const margin = Math.max(0, (W - Math.min(W, 780)) / 2);
+    const edge = Math.min(170, Math.max(0, margin - 12));   // how far in the veil's clouds rest
+    const inner = W / 2 - 400;                               // where the quote's halo begins
+    const k = clamp(Math.min(H / 1100, W / 1500), 0.4, 1.1); // css px per statue unit, shared so they stand at one scale
+    const key = `${k}|${H}`;
+    if (carvedFor !== key) { carved.clear(); carvedFor = key; }
+
+    const placed = [];
+    for (const side of [-1, 1]) {
+      let reach = edge;                                      // how far in from this side the last statue reached
+      for (const slot of SLOTS.filter(s => s.side === side)) {
+        const st = STATUES[slot.name], ks = k * slot.scale;
+        const outward = Math.max(CAP_HALF, side < 0 ? st.cx : st.w - st.cx) * ks;
+        const inward = Math.max(CAP_HALF, side < 0 ? st.w - st.cx : st.cx) * ks;
+        const d = reach + outward + 8;                       // the column's axis, measured in from this side
+        if (slot.depth === "far" && d + inward > inner + 90) continue;
+        reach = d + inward;
+
+        const foot = H * slot.foot;
+        const shaft = Math.max(120, Math.round((foot - H * slot.top) / ks - st.h - CAPITAL));
+        const def = mount(slot.name, shaft);
+        let cv = carved.get(slot.name);
+        if (!cv) carved.set(slot.name, cv = carveStatue(def, def.h * ks, slot.tone));
+        // lean about the foot, then shift the foot so the statue itself lands where it was placed
+        const tilt = (slot.tilt * Math.PI) / 180;
+        const x = (side < 0 ? d : W - d) - Math.sin(tilt) * (def.h - st.h / 2) * ks;
+        placed.push({ depth: slot.depth, cv, x, foot, tilt, axis: def.axis * ks });
+      }
+    }
+    return placed;
+  }
+  function paintStatues(g, statues, depth) {
+    for (const s of statues) {
+      if (s.depth !== depth) continue;
+      g.save();
+      g.translate(s.x * dpr, s.foot * dpr);
+      g.rotate(s.tilt);
+      g.drawImage(s.cv, -s.axis * dpr, -s.cv.height);
+      g.restore();
+    }
+  }
+
   // Olympus at dawn, painted per pixel once per resize. Three ranges, far to near. Each has a
   // jagged fractal crest; faces turned toward the sun (left) are warm, the rest lavender shade;
   // gullies run down the fall line; the crest catches a thin rim of sunrise; the high summits
@@ -707,16 +1151,18 @@ const Sky = (() => {
       { seed: 5, base: 0.82, amp: 0.15, rough: 0.6, alpha: 0.5, fade: 0.85, tex: 0.25, rim: 0.4,
         peaks: [[0.44, 0.08, 0.7], [0.6, 0.1, 0.95], [0.9, 0.09, 0.75]],
         lit: [226, 216, 232], shade: [196, 200, 230], haze: [232, 224, 238] },
-      { seed: 3, base: 0.86, amp: 0.3, rough: 0.63, alpha: 0.78, fade: 0.8, tex: 0.55, rim: 1, snow: 0.8,
+      { seed: 3, base: 0.86, amp: 0.3, rough: 0.63, alpha: 0.78, fade: 0.8, tex: 0.55, rim: 1, snow: 0.8, statues: "far",
         peaks: [[0.2, 0.13, 1], [0.33, 0.07, 0.6], [0.8, 0.12, 0.66], [0.94, 0.06, 0.48]],
         lit: [230, 212, 226], shade: [166, 174, 218], haze: [230, 220, 236] },
-      { seed: 9, base: 0.9, amp: 0.2, rough: 0.64, alpha: 0.82, fade: 0.78, tex: 0.7, rim: 0.8,
+      { seed: 9, base: 0.9, amp: 0.2, rough: 0.64, alpha: 0.82, fade: 0.78, tex: 0.7, rim: 0.8, statues: "near",
         peaks: [[0.06, 0.09, 0.8], [0.52, 0.08, 0.42], [0.68, 0.11, 0.9]],
         lit: [224, 204, 218], shade: [152, 158, 204], haze: [238, 224, 230] },
     ];
 
+    const statues = placeStatues();
     const K = 8;
     for (const L of layers) {
+      if (L.statues) paintStatues(g, statues, L.statues);
       const n = 2048;
       const nz = midpoint(n, L.seed, L.rough);
       const crag = midpoint(n, L.seed + 100, 0.72);
