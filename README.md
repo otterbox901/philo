@@ -23,3 +23,4 @@ python server.py       # http://127.0.0.1:8765
 ```
 
 The quote index is built on first launch and rebuilt automatically if the model or quotes change. For a terminal version, run `python main.py`.
+ 
