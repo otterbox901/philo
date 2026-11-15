@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from eval import cluster_bootstrap, ranks
+from retrieval.eval import cluster_bootstrap, ranks
 
 # Three unit-length candidates and two queries with known orderings.
 CANDIDATES = torch.tensor([[1.0, 0.0], [0.0, 1.0], [0.6, 0.8]])

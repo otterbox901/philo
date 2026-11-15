@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from transformers import AutoModel, AutoTokenizer
 
-from lookup_gen import DATA_PATH, INDEX_NAME, build_index, encode, model_hash
+from retrieval.lookup_gen import DATA_PATH, INDEX_NAME, build_index, encode, model_hash
 
 MAX_CHARS = 1000
 pairs_path = "data/processed/pairs.parquet"

@@ -3,8 +3,8 @@ import torch
 import time
 import pandas as pd
 
-from qwen_intent import intent_model
-from qwen_intent import encode_intent, load_intent_model, template
+from intent.qwen_intent import intent_model
+from intent.qwen_intent import encode_intent, load_intent_model, template
 
 train_path= "data/processed/pairs_train.parquet"
 val_path= "data/processed/pairs_val.parquet"

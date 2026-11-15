@@ -17,15 +17,29 @@ The pooling, loss, batching and training loop are written by hand as a learning 
 
 ## Running it
 
+Run everything from the project root:
+
 ```bash
 uv sync
-python train.py                   # fine-tunes MiniLM, saving each epoch to models/v2-e1 ... v2-e4
-python eval.py --model base --model models/v2-e2   # retrieval scores on held-out pairs, vs plain MiniLM
-python build_intent_features.py   # runs Qwen over every training message (about an hour on a 4 GB GPU)
-python train_intent_head.py       # trains the intent head in seconds -> models/intent_head.pt
-python server.py --model models/v2-e2   # http://127.0.0.1:8765
+python -m retrieval.train                 # fine-tunes MiniLM, saving each epoch to models/v2-e1 ... v2-e4
+python -m retrieval.eval --model base --model models/v2-e2   # retrieval scores on held-out pairs, vs plain MiniLM
+python -m intent.build_intent_features    # runs Qwen over every training message (about an hour on a 4 GB GPU)
+python -m intent.train_intent_head        # trains the intent head in seconds -> models/intent_head.pt
+python server.py --model models/v2-e2     # http://127.0.0.1:8765
 ```
 
-Serve whichever epoch scores best in `eval.py`. The server needs `models/intent_head.pt`. Qwen runs on the CPU and adds about 0.1 s per request; `--intent-device cuda` moves it to the GPU.
+Serve whichever epoch scores best in `retrieval.eval`. The server needs `models/intent_head.pt`. Qwen runs on the CPU and adds about 0.1 s per request; `--intent-device cuda` moves it to the GPU.
 
-The quote index is built on first launch and rebuilt automatically if the model or quotes change. For a terminal version without intent routing, run `python main.py --model models/v2-e2`.
+The quote index is built on first launch and rebuilt automatically if the model or quotes change. For a terminal version without intent routing, run `python -m retrieval.main --model models/v2-e2`.
+
+## Layout
+
+| Folder | What's in it |
+| --- | --- |
+| `retrieval/` | The MiniLM bi-encoder: training, evaluation, the quote index and `QuoteMatcher` |
+| `intent/` | The Qwen intent router: feature extraction, the intent head and the router |
+| `gen/` | Synthetic training data from the Claude Batch API (run order in `gen/__init__.py`) |
+| `scripts/data/` | Downloads and cleans the quote corpus |
+| `experiments/` | The first hand-written encoder, kept for reference |
+| `server.py`, `ui/` | The web app |
+| `tests/` | One folder per package |

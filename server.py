@@ -14,9 +14,9 @@ import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from router import HEAD_PATH, IntentRouter
+from intent.router import HEAD_PATH, IntentRouter
 
-from main import MAX_CHARS, QuoteMatcher
+from retrieval.main import MAX_CHARS, QuoteMatcher
 
 UI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui", "index.html")
 MAX_BODY = 16 * 1024

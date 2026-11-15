@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 
-from qwen_intent import encode_intent, intent_model, load_intent_model, template
-from train_intent_head import IntentHead
+from intent.qwen_intent import encode_intent, intent_model, load_intent_model, template
+from intent.train_intent_head import IntentHead
 
 HEAD_PATH = "models/intent_head.pt"
 ABSURD_AT = 0.8

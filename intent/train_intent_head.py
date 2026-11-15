@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from build_intent_features import hash_text
+from intent.build_intent_features import hash_text
 
 train_path = "data/processed/pairs_train.parquet"
 val_path = "data/processed/pairs_val.parquet"
@@ -26,7 +26,7 @@ class IntentHead(nn.Module):
 def load_split(path, features, split):
     pairs = pd.read_parquet(path)
     if hash_text(pairs["input"].tolist()) != features[f"{split}_hash"]:
-        raise SystemExit(f"{path} changed after {features_path} was built: rerun build_intent_features.py")
+        raise SystemExit(f"{path} changed after {features_path} was built: rerun python -m intent.build_intent_features")
     x = (features[split].float() - features["mean"]) / features["std"]
     y = torch.tensor(pairs["mode"].map(modes.index).to_numpy())
     return x, y

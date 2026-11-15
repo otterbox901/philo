@@ -6,8 +6,8 @@ import pandas as pd
 import torch
 from transformers import AutoModel, AutoTokenizer
 
-from lookup_gen import DATA_PATH, INDEX_NAME, encode
-from main import QuoteMatcher
+from retrieval.lookup_gen import DATA_PATH, INDEX_NAME, encode
+from retrieval.main import QuoteMatcher
 
 BASE_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 VAL_PATH = "data/processed/pairs_val.parquet"
