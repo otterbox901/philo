@@ -19,6 +19,7 @@ The pooling, loss, batching and training loop are written by hand as a learning 
 ```bash
 uv sync
 python train.py        # writes the fine-tuned model to models/v1
+python eval.py --model base --model models/v1   # retrieval scores on held-out pairs, vs plain MiniLM
 python server.py       # http://127.0.0.1:8765
 ```
 
