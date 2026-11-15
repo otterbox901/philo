@@ -14,6 +14,7 @@ import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from router import HEAD_PATH, IntentRouter
 
 from main import MAX_CHARS, QuoteMatcher
 
@@ -24,6 +25,7 @@ MAX_BODY = 16 * 1024
 class Handler(BaseHTTPRequestHandler):
     matcher: QuoteMatcher = None
     lock = threading.Lock()
+    router: IntentRouter = None
 
     def _send(self, status, body, content_type):
         self.send_response(status)
@@ -63,8 +65,8 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             with self.lock:
-                results = self.matcher.match(text, k=1)
-            quote, author, score = results[0]
+                route, _ = self.router.route(text)
+                quote, author, score = self.matcher.match(text, k=1, route=route)[0]
         except Exception as e:
             self.log_error("match failed: %r", e)
             return self._json(500, {"error": "the model hit an error, see the server log"})
@@ -80,10 +82,16 @@ def main():
     parser.add_argument("--model", type=str, default="models/v1")
     parser.add_argument("--host", type=str, default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--head", type=str, default=HEAD_PATH)
+    parser.add_argument("--intent-device", type=str, default="cpu")
+
     args = parser.parse_args()
 
     print(f"loading {args.model}...")
     Handler.matcher = QuoteMatcher(args.model)
+    print(f"loading {args.head} on {args.intent_device}...")
+    Handler.router = IntentRouter(args.head, device=args.intent_device)
+
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Philo is up at http://{args.host}:{args.port}", flush=True)
     try:

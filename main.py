@@ -9,6 +9,12 @@ from transformers import AutoModel, AutoTokenizer
 from lookup_gen import DATA_PATH, INDEX_NAME, build_index, encode, model_hash
 
 MAX_CHARS = 1000
+pairs_path = "data/processed/pairs.parquet"
+absurd_pool = 50
+
+def absurd_mask(quote_ids, pairs):
+    absurd = set(pairs.loc[pairs["mode"]=="nonsense", "quote_id"])
+    return torch.tensor([qid in absurd for qid in quote_ids])
 
 class QuoteMatcher:
     def __init__(self, model_dir="models/v1", data_path=DATA_PATH, device="cpu"):
@@ -23,6 +29,8 @@ class QuoteMatcher:
 
         self.embeddings = index["embeddings"].to(self.model.device)
         self.quote_ids = index["quote_ids"]
+
+        self.absurd= absurd_mask(self.quote_ids, pd.read_parquet(pairs_path)).to(self.model.device)
 
         self.quotes = data.set_index("quote_id")
         assert self.quotes.index.is_unique, "quote_id must be unique"
@@ -46,7 +54,7 @@ class QuoteMatcher:
             return "quotes changed"
         return None
 
-    def match(self, text, k=1, pool=5):
+    def match(self, text, k=1, pool=5, route=None):
         text = text.strip()
         if not text:
             return []
@@ -55,10 +63,18 @@ class QuoteMatcher:
 
         q = encode([text], self.model, self.tokenizer)[0]
         k = min(k, len(self.quote_ids))
-        scores, rows = torch.topk(self.embeddings @ q, pool)
-        random_index=random.sample(range(pool), k)
-        scores=scores[random_index]
-        rows= rows[random_index]
+
+        scores = self.embeddings @ q
+        if route == "absurd":
+            scores = scores.masked_fill(~self.absurd, float("-inf"))
+            scores, rows = torch.topk(scores, absurd_pool)
+            pick = torch.randperm(absurd_pool, device=scores.device)[:k]
+        else:
+            scores, rows = torch.topk(scores, pool)
+            weights = torch.softmax(scores / 0.02, dim=0)
+            pick = torch.multinomial(weights, k)
+
+        scores, rows = scores[pick], rows[pick]
 
         results = []
         for score, row in zip(scores.tolist(), rows.tolist()):
