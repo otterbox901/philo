@@ -6,7 +6,7 @@ Type up to 1,000 characters about anything and get back one quote from a philoso
 
 ## How it works
 
-Off-the-shelf sentence embeddings match by topic, so "I'm nervous about my exam" pulls up quotes about knowledge or testing. Philo fine-tunes `sentence-transformers/all-MiniLM-L6-v2` so that "close" means "a good reply" instead.
+Off-the-shelf sentence embeddings match by topic, so "I'm nervous about my exam" pulls up quotes about knowledge or testing. Philo fine-tunes `sentence-transformers/all-MiniLM-L6-v2` so that "close" means "a good reply" instead. The fine-tuned model is on Hugging Face as [otterbox901/philo-minilm](https://huggingface.co/otterbox901/philo-minilm).
 
 - **Training data.** Claude Haiku worked backwards from real quotes. For each quote it wrote messages the quote would be a good reply to, in each of the four modes, and it rejected quotes that didn't fit a mode. Two generation rounds used 7,721 different quotes and, after filtering, gave 90,378 pairs for under $5 in total. Each round is split 90/10 by quote, so no quote appears in both training and validation.
 - **Training.** Contrastive (InfoNCE) loss over batches of 64 pairs with no repeated quotes, using AdamW with linear warmup and decay.
@@ -28,7 +28,7 @@ python -m intent.train_intent_head        # trains the intent head in seconds ->
 python server.py --model models/v2-e2     # http://127.0.0.1:8765
 ```
 
-Serve whichever epoch scores best in `retrieval.eval`. The server needs `models/intent_head.pt`. Qwen runs on the CPU and adds about 0.1 s per request; `--intent-device cuda` moves it to the GPU.
+Serve whichever epoch scores best in `retrieval.eval`. To skip training, download the published model (the epoch 2 checkpoint) with `hf download otterbox901/philo-minilm --local-dir models/philo-minilm` and pass `--model models/philo-minilm`. The server needs `models/intent_head.pt`. Qwen runs on the CPU and adds about 0.1 s per request; `--intent-device cuda` moves it to the GPU.
 
 The quote index is built on first launch and rebuilt automatically if the model or quotes change. For a terminal version without intent routing, run `python -m retrieval.main --model models/v2-e2`.
 
