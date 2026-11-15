@@ -2,7 +2,7 @@
 
 Run the steps in this order, from the project root:
 
-    python -m gen.build_requests   # 1. sample 4,000 quotes, write data/gen/requests.jsonl
+    python -m gen.build_requests   # 1. sample N_QUOTES unused quotes, write the round's requests.jsonl
     python -m gen.pilot            # 2. 50-quote pilot with normal API calls; read the report
     python -m gen.submit --confirm # 3. submit the full run as a Message Batch (costs money)
     python -m gen.collect          # 4. wait for the batch, download results, retry failures once

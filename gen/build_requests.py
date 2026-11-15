@@ -2,9 +2,10 @@
 
 Run:  python -m gen.build_requests
 
-Writes:
-  data/gen/sample_ids.txt  - the 4,000 sampled quote_ids (reused on later runs)
-  data/gen/requests.jsonl  - 2,000 requests, one JSON object per line
+Works on generation round config.ROUND and never samples a quote an earlier round used.
+Writes, in that round's folder (data/gen/ for round 1, data/gen/round<N>/ after):
+  sample_ids.txt  - the N_QUOTES sampled quote_ids (reused on later runs)
+  requests.jsonl  - one request per (mode, group of 8 quotes), one JSON object per line
 """
 
 import json
@@ -80,7 +81,9 @@ def chunk(items, size):
 
 def nonsense_themes(batch_index):
     """The themes for one nonsense request. Seeded per request, so rebuilding gives the same ones."""
-    rng = random.Random(f"{config.SEED}-{batch_index}")
+    # Later rounds add the round to the seed, so group 12 of round 2 doesn't reuse group 12's themes.
+    seed = f"{config.SEED}-{batch_index}" if config.ROUND == 1 else f"{config.SEED}-r{config.ROUND}-{batch_index}"
+    rng = random.Random(seed)
     return rng.sample(NONSENSE_THEMES, config.NONSENSE_THEMES_PER_REQUEST)
 
 
@@ -125,13 +128,29 @@ def build_requests(quote_ids, text_by_id):
     return requests
 
 
+def earlier_round_ids(current_round):
+    """Every quote_id sampled by rounds 1 .. current_round - 1."""
+    used = set()
+    for n in range(1, current_round):
+        path = config.round_dir(n) / "sample_ids.txt"
+        if not path.exists():
+            # Without it we can't tell which quotes round n used, and could sample them again.
+            raise SystemExit(f"{path} is missing; round {current_round} needs it to avoid reusing round {n}'s quotes")
+        used.update(path.read_text().split())
+    return used
+
+
 def load_or_create_sample(quotes):
-    """Return the sampled quote_ids, reusing data/gen/sample_ids.txt if it already exists."""
+    """Return this round's sampled quote_ids, reusing its sample_ids.txt if it already exists."""
+    used_before = earlier_round_ids(config.ROUND)
     if config.SAMPLE_IDS_PATH.exists():
         quote_ids = config.SAMPLE_IDS_PATH.read_text().split()
         missing = set(quote_ids) - set(quotes["quote_id"])
         if missing:
             raise ValueError(f"{len(missing)} ids in {config.SAMPLE_IDS_PATH} are no longer in quotes.parquet")
+        reused = set(quote_ids) & used_before
+        if reused:
+            raise ValueError(f"{len(reused)} ids in {config.SAMPLE_IDS_PATH} were already used by an earlier round")
         if config.EVAL_DIR.exists():
             # data/eval may have been created after the sample was saved: make sure it doesn't overlap.
             sampled = quotes[quotes["quote_id"].isin(quote_ids)]
@@ -152,9 +171,12 @@ def load_or_create_sample(quotes):
         print(f"After excluding eval quotes: {len(pool)} ({before - len(pool)} removed)")
     else:
         print(f"No {config.EVAL_DIR} folder, so no eval quotes to exclude")
+    if used_before:
+        pool = pool[~pool["quote_id"].isin(used_before)]
+        print(f"After excluding rounds 1-{config.ROUND - 1}: {len(pool)} ({len(used_before)} used before)")
 
     quote_ids = sample_quote_ids(pool, config.N_QUOTES, config.SEED)
-    config.GEN_DIR.mkdir(parents=True, exist_ok=True)
+    config.ROUND_DIR.mkdir(parents=True, exist_ok=True)
     config.SAMPLE_IDS_PATH.write_text("\n".join(quote_ids) + "\n")
     print(f"Sampled {len(quote_ids)} ids (seed {config.SEED}) -> {config.SAMPLE_IDS_PATH}")
     return quote_ids
@@ -173,7 +195,8 @@ def main():
     with open(config.REQUESTS_PATH, "w") as f:
         for request in requests:
             f.write(json.dumps(request, ensure_ascii=False) + "\n")
-    print(f"Wrote {len(requests)} requests ({len(MODES)} modes x {len(requests) // len(MODES)}) -> {config.REQUESTS_PATH}")
+    print(f"Round {config.ROUND}: wrote {len(requests)} requests "
+          f"({len(MODES)} modes x {len(requests) // len(MODES)}) -> {config.REQUESTS_PATH}")
 
 
 if __name__ == "__main__":

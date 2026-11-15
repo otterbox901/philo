@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from gen.filter import apply_filters, content_words, overlap_ratio, split_by_quote
+from gen.filter import apply_filters, content_words, overlap_ratio, pairs_from_entries, split_by_quote, split_each_round
 
 # Content words: unexamined, life, worth, living  ("the", "is", "not" are stopwords)
 QUOTE = "The unexamined life is not worth living."
@@ -84,3 +84,26 @@ def test_split_is_reproducible_and_ignores_row_order(pairs):
     _, val_a = split_by_quote(pairs, 0.1, seed=42)
     _, val_b = split_by_quote(pairs.sample(frac=1, random_state=0), 0.1, seed=42)
     assert set(val_a["quote_id"]) == set(val_b["quote_id"])
+
+
+# --- multiple generation rounds -------------------------------------------------------
+
+
+def test_adding_a_round_leaves_earlier_splits_unchanged(pairs):
+    round1 = pairs.assign(round=1)
+    train1, val1 = split_each_round(round1, 0.1, seed=42)
+    round2 = pd.DataFrame(
+        [{"input": f"new {q}-{i}", "quote_id": f"r2q{q}", "mode": "advice", "philosopher": "y", "round": 2}
+         for q in range(50) for i in range(4)]
+    )
+    train, val = split_each_round(pd.concat([round1, round2], ignore_index=True), 0.1, seed=42)
+    assert set(val[val["round"] == 1]["quote_id"]) == set(val1["quote_id"])
+    assert set(train[train["round"] == 1]["quote_id"]) == set(train1["quote_id"])
+    assert val[val["round"] == 2]["quote_id"].nunique() == 5  # 10% of round 2's 50 quotes
+    assert set(train["quote_id"]).isdisjoint(set(val["quote_id"]))
+
+
+def test_pairs_keep_their_round():
+    entries = [{"quote_id": "q1", "mode": "advice", "fits": True, "inputs": ["a", "b"], "round": 2},
+               {"quote_id": "q2", "mode": "advice", "fits": False, "inputs": [], "round": 2}]
+    assert [p["round"] for p in pairs_from_entries(entries)] == [2, 2]

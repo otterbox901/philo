@@ -35,3 +35,22 @@ def test_requests_one_per_mode_and_group():
     # the shared system prompt is marked for caching; the mode is in the user message
     assert requests[0]["params"]["system"][0]["cache_control"]["type"] == "ephemeral"
     assert "Mode: nonsense" in requests[-1]["params"]["messages"][0]["content"]
+
+
+def test_later_rounds_never_reuse_earlier_quotes(tmp_path, monkeypatch):
+    from gen import config
+    from gen.build_requests import load_or_create_sample
+
+    quotes = pd.DataFrame({"quote_id": [f"q{i}" for i in range(30)], "text": ["one two three four five"] * 30})
+    round_dirs = {1: tmp_path, 2: tmp_path / "round2"}
+    (tmp_path / "sample_ids.txt").write_text("\n".join(f"q{i}" for i in range(20)) + "\n")
+    monkeypatch.setattr(config, "round_dir", lambda n: round_dirs[n])
+    monkeypatch.setattr(config, "ROUND", 2)
+    monkeypatch.setattr(config, "ROUND_DIR", round_dirs[2])
+    monkeypatch.setattr(config, "SAMPLE_IDS_PATH", round_dirs[2] / "sample_ids.txt")
+    monkeypatch.setattr(config, "EVAL_DIR", tmp_path / "no_eval")
+    monkeypatch.setattr(config, "N_QUOTES", 10)
+
+    sampled = load_or_create_sample(quotes)
+    assert sorted(sampled) == sorted(f"q{i}" for i in range(20, 30))  # only the 10 unused quotes
+    assert load_or_create_sample(quotes) == sampled  # second call reuses the saved sample

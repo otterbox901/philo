@@ -46,8 +46,8 @@ quotes= pd.read_parquet("data/processed/quotes.parquet")
 train = pd.read_parquet("data/processed/pairs_train.parquet")
 train= train.merge(quotes[["quote_id", "text"]], on = "quote_id")
 
-batch_size, temperature = 64, 0.05
-total_steps= len(train) // batch_size
+batch_size, temperature, epochs = 64, 0.05, 4
+total_steps= epochs*(len(train) // batch_size)
 loss_function= torch.nn.CrossEntropyLoss()
 optimizer= torch.optim.AdamW(model.parameters(), lr = 2e-5)
 scheduler = get_linear_schedule_with_warmup(optimizer, int(0.1*total_steps), total_steps)
@@ -55,24 +55,24 @@ scheduler = get_linear_schedule_with_warmup(optimizer, int(0.1*total_steps), tot
 #start training
 
 model.train()
-for step, (inputs, quote_texts) in enumerate(make_batches(train, batch_size)):
-    optimizer.zero_grad()
-    q= encode_train(inputs)
-    d= encode_train(quote_texts)
-    scores = q @ d.T / temperature
+for epoch in range(epochs):
+    for step, (inputs, quote_texts) in enumerate(make_batches(train, batch_size)):
+        optimizer.zero_grad()
+        q= encode_train(inputs)
+        d= encode_train(quote_texts)
+        scores = q @ d.T / temperature
 
-    labels = torch.arange( len(inputs), device= device)
-    loss= loss_function(scores, labels)
+        labels = torch.arange( len(inputs), device= device)
+        loss= loss_function(scores, labels)
 
-    loss.backward()
-    optimizer.step()
-    scheduler.step()
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
 
-    if step%50==0:
-        print(step, round(loss.item(),3))
-
-model.save_pretrained("models/v1")
-tokenizer.save_pretrained("models/v1")
+        if step%50==0:
+            print(epoch, step, round(loss.item(),3))
+    model.save_pretrained(f"models/v2-e{epoch+1}")
+    tokenizer.save_pretrained(f"models/v2-e{epoch+1}")
 
 
 

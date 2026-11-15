@@ -8,9 +8,17 @@ EFFORT = "medium"  # how hard the model thinks: "low", "medium", "high", ... ("m
 MAX_TOKENS = 16000  # room for thinking plus the JSON answer for 8 quotes
 CACHE_TTL = "1h"  # how long the cached system prompt lives; batches can run longer than 5 minutes
 
+# --- Rounds ------------------------------------------------------------------
+# Each generation round samples quotes that no earlier round used and keeps its own sample,
+# requests, batches and responses. Round 1 (the original run) lives directly in data/gen/;
+# later rounds live in data/gen/round<N>/. build_requests, pilot, submit and collect work on
+# ROUND; filter combines every round from 1 to ROUND.
+ROUND = 2
+N_QUOTES_BY_ROUND = {1: 4000, 2: 4400}  # round 2: ~$2.45 at round 1's measured token use
+
 # --- Sampling ----------------------------------------------------------------
 SEED = 42
-N_QUOTES = 4000
+N_QUOTES = N_QUOTES_BY_ROUND[ROUND]
 MIN_WORDS = 5  # drop quotes shorter than this
 MAX_WORDS = 60  # drop quotes longer than this
 QUOTES_PER_REQUEST = 8
@@ -31,13 +39,21 @@ QUOTES_PATH = ROOT / "data" / "processed" / "quotes.parquet"
 EVAL_DIR = ROOT / "data" / "eval"
 
 GEN_DIR = ROOT / "data" / "gen"
-SAMPLE_IDS_PATH = GEN_DIR / "sample_ids.txt"
-REQUESTS_PATH = GEN_DIR / "requests.jsonl"
-BATCHES_PATH = GEN_DIR / "batches.json"  # which batches were submitted, and what happened to them
-RAW_DIR = GEN_DIR / "raw"  # one file per successful request
+
+
+def round_dir(n):
+    """Where generation round n keeps its files."""
+    return GEN_DIR if n == 1 else GEN_DIR / f"round{n}"
+
+
+ROUND_DIR = round_dir(ROUND)
+SAMPLE_IDS_PATH = ROUND_DIR / "sample_ids.txt"
+REQUESTS_PATH = ROUND_DIR / "requests.jsonl"
+BATCHES_PATH = ROUND_DIR / "batches.json"  # which batches were submitted, and what happened to them
+RAW_DIR = ROUND_DIR / "raw"  # one file per successful request
 FAILED_RAW_DIR = RAW_DIR / "failed"  # raw responses of failed attempts, for debugging
-FAILED_LOG_PATH = GEN_DIR / "failed.jsonl"  # requests that failed even after the retry
-PILOT_RAW_DIR = GEN_DIR / "pilot" / "raw"
+FAILED_LOG_PATH = ROUND_DIR / "failed.jsonl"  # requests that failed even after the retry
+PILOT_RAW_DIR = ROUND_DIR / "pilot" / "raw"
 
 PAIRS_PATH = ROOT / "data" / "processed" / "pairs.parquet"
 TRAIN_PATH = ROOT / "data" / "processed" / "pairs_train.parquet"

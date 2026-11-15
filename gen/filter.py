@@ -2,8 +2,12 @@
 
 Run:  python -m gen.filter
 
+Combines every generation round from 1 to config.ROUND. Each round is split by quote on
+its own, so adding a round never moves an earlier round's quote between train and val:
+models trained before the new round can still be evaluated fairly on the new val set.
+
 Writes data/processed/pairs.parquet, pairs_train.parquet and pairs_val.parquet,
-each with columns: input, quote_id, mode, philosopher.
+each with columns: input, quote_id, mode, philosopher, round.
 """
 
 import random
@@ -53,7 +57,7 @@ def normalize_for_dedup(text):
 def pairs_from_entries(entries):
     """One row per generated input, for quotes the model said fit the mode."""
     return [
-        {"input": text, "quote_id": entry["quote_id"], "mode": entry["mode"]}
+        {"input": text, "quote_id": entry["quote_id"], "mode": entry["mode"], "round": entry.get("round", 1)}
         for entry in entries
         if entry["fits"]
         for text in entry["inputs"]
@@ -95,19 +99,42 @@ def split_by_quote(pairs, val_fraction, seed):
     return pairs[~is_val].reset_index(drop=True), pairs[is_val].reset_index(drop=True)
 
 
+def split_each_round(pairs, val_fraction, seed):
+    """split_by_quote applied to each round separately, so a new round can't reshuffle old ones."""
+    splits = [split_by_quote(pairs[pairs["round"] == n], val_fraction, seed) for n in sorted(pairs["round"].unique())]
+    train = pd.concat([t for t, _ in splits], ignore_index=True)
+    val = pd.concat([v for _, v in splits], ignore_index=True)
+    return train, val
+
+
+def load_all_rounds(last_round):
+    """Entries from rounds 1 .. last_round, in round order, each tagged with its round."""
+    entries, n_unparseable = [], 0
+    for n in range(1, last_round + 1):
+        raw_dir = config.round_dir(n) / "raw"
+        round_entries, bad = load_generations(raw_dir)
+        if not round_entries:
+            print(f"Round {n}: no results in {raw_dir} yet, skipping it")
+        entries += [{**entry, "round": n} for entry in round_entries]
+        n_unparseable += bad
+    return entries, n_unparseable
+
+
 def main():
     quotes = pd.read_parquet(config.QUOTES_PATH)
     quote_text_by_id = dict(zip(quotes["quote_id"], quotes["text"]))
     author_by_id = dict(zip(quotes["quote_id"], quotes["author"]))
 
-    entries, n_unparseable = load_generations(config.RAW_DIR)
+    # Round order matters: when a later round repeats an input, the earlier copy is the one kept.
+    entries, n_unparseable = load_all_rounds(config.ROUND)
     if not entries:
-        raise SystemExit(f"No results in {config.RAW_DIR}. Run gen.submit and gen.collect first.")
+        raise SystemExit("No results in any round. Run gen.submit and gen.collect first.")
     kept, dropped = apply_filters(pairs_from_entries(entries), quote_text_by_id)
 
-    pairs = pd.DataFrame(kept, columns=["input", "quote_id", "mode"])
+    pairs = pd.DataFrame(kept, columns=["input", "quote_id", "mode", "round"])
     pairs["philosopher"] = pairs["quote_id"].map(author_by_id)
-    train, val = split_by_quote(pairs, config.VAL_FRACTION, config.SEED)
+    pairs = pairs[["input", "quote_id", "mode", "philosopher", "round"]]
+    train, val = split_each_round(pairs, config.VAL_FRACTION, config.SEED)
 
     pairs.to_parquet(config.PAIRS_PATH, index=False)
     train.to_parquet(config.TRAIN_PATH, index=False)
@@ -131,6 +158,9 @@ def main():
     table = pd.crosstab(by_split["mode"], by_split["split"], margins=True, margins_name="total")
     print("Pairs per mode and split:")
     print(table.to_string(), "\n")
+    per_round = pd.crosstab(by_split["round"], by_split["split"], margins=True, margins_name="total")
+    print("Pairs per round and split:")
+    print(per_round.to_string(), "\n")
     print(f"Quotes: {train['quote_id'].nunique()} train, {val['quote_id'].nunique()} val")
     print(f"Wrote {config.PAIRS_PATH}, {config.TRAIN_PATH.name}, {config.VAL_PATH.name}")
 
